@@ -12,7 +12,8 @@ service cloud.firestore {
     }
 
     match /trips/{tripId} {
-      allow read: if isMember(resource.data);
+      // 아직 없는 문서를 읽을 때(resource == null)도 거절하지 않게 — 새 여행을 만들 때 필요
+      allow read: if resource == null || isMember(resource.data);
 
       // 공유 시작: 만든 사람 혼자만 멤버로
       allow create: if signedIn()

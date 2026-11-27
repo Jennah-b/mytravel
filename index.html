@@ -427,7 +427,7 @@ window.addEventListener('appinstalled',()=>{deferredPrompt=null;render()});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 /* ---------- 계정 · 같이 쓰기 (Firebase) ---------- */
 const FBV='10.12.2',CFG=window.FIREBASE_CONFIG||null;
-let fb=null,fbUid=null,fbUser=null,fbReady=null,idxUnsub=null,afterLogin=null,loginAsked=false;const subs={},synced={},pendPh=new Set();
+let fb=null,fbUid=null,fbUser=null,fbReady=null,idxUnsub=null,afterLogin=null,loginAsked=false;const subs={},synced={},pendPh=new Set(),seen={};
 const rand=n=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789',r=new Uint32Array(n);crypto.getRandomValues(r);return[...r].map(x=>a[x%a.length]).join('')};
 const stable=o=>o===null||typeof o!=='object'?JSON.stringify(o??null):Array.isArray(o)?'['+o.map(stable).join(',')+']':'{'+Object.keys(o).filter(k=>o[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
 function phash(s){let h=5381;for(let i=0;i<s.length;i+=7)h=((h<<5)+h+s.charCodeAt(i))|0;return s.length.toString(36)+'x'+(h>>>0).toString(36)}
@@ -478,15 +478,21 @@ async function emailLogin(v){const el=()=>$('#serr');if(!fb){if(el())el().textCo
 function pwReset(){const em=($('#f_email')||{}).value||'';if(!em){$('#serr').textContent='위에 이메일을 먼저 적어주세요';return}if(!fb)return;
   fb.U.sendPasswordResetEmail(fb.auth,em).then(()=>{$('#serr').textContent='비밀번호 재설정 메일을 보냈어요. 메일함을 확인해주세요'}).catch(e=>{$('#serr').textContent=authMsg(e)})}
 async function logout(){if(!fb)return;for(const id of Object.keys(trips))if(trips[id].shared)delete trips[id];ui.view='home';await persist();try{localStorage.removeItem('tripnote.name')}catch(e){}fb.U.signOut(fb.auth).then(()=>toast('로그아웃했어요'))}
+function dupGroups(){const g={};Object.values(trips).forEach(t=>{const ms=t.shared&&t.shared.members||{};if(!t.shared||t.shared.owner!==fbUid||Object.keys(ms).length!==1)return;const k=stable(toRemote(t));(g[k]=g[k]||[]).push(t)});return Object.values(g).filter(a=>a.length>1)}
+async function cleanDups(){const gs=dupGroups();let n=0;toast('정리하는 중…');
+  for(const a of gs){a.sort((x,y)=>x.id.localeCompare(y.id));for(const t of a.slice(1)){await remoteDelete(t.id,t);delete trips[t.id];n++}}
+  save();render();toast(n+'개 복사본을 지웠어요')}
 function accountHTML(){if(!CFG)return'';
   if(!fbUser)return`<div class="install" style="background:var(--sage);color:var(--ink)"><p>로그인하면 여행이 계정에 저장돼요. 폰을 바꿔도, 앱을 지워도 그대로예요.</p><button class="btn sm" data-act="login">로그인</button></div>`;
-  return`<div class="acct"><span class="sp">${esc(fbUser.email||myName())} 계정에 저장 중</span><button class="btn ghost sm" data-act="logout">로그아웃</button></div>`}
+  const dg=dupGroups(),extra=dg.reduce((s,a)=>s+a.length-1,0);
+  return`<div class="acct"><span class="sp">${esc(fbUser.email||myName())} 계정에 저장 중</span><button class="btn ghost sm" data-act="logout">로그아웃</button></div>
+  ${extra?`<div class="install" style="background:light-dark(#f8dccf,#3d2018);color:var(--ink)"><p>오류로 똑같은 여행이 <b>${extra}개</b> 더 생겼어요. 하나씩만 남기고 정리할게요.</p><button class="btn sm" data-act="cleanDups">정리하기</button></div>`:''}`}
 function index(id,on){if(!fbUser)return;const{F,db}=fb,ref=F.doc(db,'users',fbUid);(on?F.setDoc(ref,{trips:{[id]:{at:Date.now()}}},{merge:true}):F.updateDoc(ref,{['trips.'+id]:F.deleteField()})).catch(()=>{})}
 function cloudify(t){if(!fbUser||!t||t.shared)return;const{F,db}=fb,id=t.id,code=rand(24),members={[fbUid]:{name:myName(),at:Date.now()}};
   t.shared={owner:fbUid,code,members};synced[id]=toRemote(t);save();
-  F.setDoc(F.doc(db,'trips',id),{owner:fbUid,members,inviteCode:code,joinWith:'',created:Date.now(),...toRemote(t)}).catch(e=>toast('계정에 저장하지 못했어요 ('+(e.code||'')+')'));
-  t.shop.forEach(i=>{if(i.photo)F.setDoc(F.doc(db,'trips',id,'photos',i.id),{data:i.photo,ph:phash(i.photo)}).catch(()=>{})});
-  index(id,true);sub(id)}
+  F.setDoc(F.doc(db,'trips',id),{owner:fbUid,members,inviteCode:code,joinWith:'',created:Date.now(),...toRemote(t)})
+    .then(()=>{index(id,true);sub(id);t.shop.forEach(i=>{if(i.photo)F.setDoc(F.doc(db,'trips',id,'photos',i.id),{data:i.photo,ph:phash(i.photo)}).catch(()=>{})})})
+    .catch(e=>toast('계정에 저장하지 못했어요 ('+(e.code||'')+')'))}
 function renameTrip(id){const t=trips[id];if(!t)return null;const nid=uid();trips[nid]={...t,id:nid};delete trips[id];if(ui.id===id)ui.id=nid;return nid}
 function toRemote(t){const cl=x=>JSON.parse(JSON.stringify(x??{})),map=(arr,f)=>{const o={};(arr||[]).forEach(x=>{if(x&&x.id)o[x.id]=f?f(x):cl(x)});return o};
   return{meta:{title:t.title||'',dest:t.dest||'',start:t.start||'',end:t.end||''},dayInfo:cl(t.dayInfo),places:map(t.places),resv:map(t.resv),checks:map(t.checks),
@@ -498,9 +504,12 @@ function fromRemote(id,d,old){const m=d.meta||{},prev={};(old&&old.shop||[]).for
     places:vals(d.places),resv:vals(d.resv),checks:vals(d.checks).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)),shop,shopFilter:old&&old.shopFilter||'ALL',
     shared:{owner:String(d.owner||''),code:String(d.inviteCode||''),members:d.members&&typeof d.members==='object'?d.members:{}}})}
 function sub(id){if(subs[id]||!fb||!fbUser)return;const{F,db}=fb;if(!synced[id]&&trips[id])synced[id]=toRemote(trips[id]);
-  subs[id]=F.onSnapshot(F.doc(db,'trips',id),snap=>{if(!snap.exists()){unshare(id,'공유가 끝난 여행이에요. 내 여행으로 사본이 남아요');return}applyRemote(id,snap.data())},
-    err=>{if(err&&err.code==='permission-denied')unshare(id,'이 여행의 공유에서 빠졌어요. 내 여행으로 사본이 남아요');else console.warn(err)})}
-function unshare(id,msg){if(subs[id]){subs[id]();delete subs[id]}delete synced[id];index(id,false);const t=trips[id];
+  subs[id]=F.onSnapshot(F.doc(db,'trips',id),snap=>{const srv=!(snap.metadata&&snap.metadata.fromCache);
+      if(!snap.exists()){if(!srv)return;if(seen[id])unshare(id,'공유가 끝난 여행이에요. 내 여행으로 사본이 남아요');else{stopSub(id);if(!trips[id])index(id,false)}return}
+      if(srv)seen[id]=true;applyRemote(id,snap.data())},
+    err=>{const was=seen[id];stopSub(id);if(err&&err.code==='permission-denied'&&was)unshare(id,'이 여행의 공유에서 빠졌어요. 내 여행으로 사본이 남아요');else console.warn(err)})}
+function stopSub(id){if(subs[id]){subs[id]();delete subs[id]}}
+function unshare(id,msg){stopSub(id);delete seen[id];delete synced[id];index(id,false);const t=trips[id];
   if(ui.pendingOpen===id){ui.pendingOpen=null;if(!t){toast('링크가 만료됐거나 잘못됐어요');render();return}}
   if(!t){render();return}
   if(t.shared){delete t.shared;const nid=renameTrip(id);save();if(fbUser&&nid)cloudify(trips[nid]);render();if(msg)toast(msg)}}
@@ -670,6 +679,7 @@ document.addEventListener('click',async e=>{
   else if(a==='glogin')googleLogin();
   else if(a==='pwReset')pwReset();
   else if(a==='logout')confirmSheet('로그아웃할까요? 계정에 저장된 여행은 이 폰에서만 지워지고, 다시 로그인하면 돌아와요.','로그아웃',logout);
+  else if(a==='cleanDups')cleanDups();
   else if(a==='allRoute'){ui.allRoute=!ui.allRoute;render()}
   else if(a==='joinPaste'){openSheet('초대 링크로 참여',[{k:'link',l:'받은 초대 링크나 메시지를 붙여넣으세요',type:'textarea'}],{},v=>{if(!/join-[a-z0-9]+-[A-Za-z0-9]+/.test(v.link))return'초대 링크를 찾지 못했어요';const L=v.link;setTimeout(()=>joinFrom(L),0)})}
   else if(a==='sclose')closeSheet();

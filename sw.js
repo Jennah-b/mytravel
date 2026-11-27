@@ -1,6 +1,6 @@
 // 여행 수첩 서비스 워커 — 앱 화면을 기기에 저장해 오프라인에서도 열리게 해요.
 // index.html 등을 고친 뒤에는 아래 VERSION 숫자를 올려야 새 버전이 반영돼요.
-const VERSION = 'tripnote-v3';
+const VERSION = 'tripnote-v4';
 const SHELL = ['./', './index.html', './firebase-config.js', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
