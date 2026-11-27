@@ -1,10 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
+    function signedIn() { return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
     function isMember(d) { return signedIn() && d.members is map && request.auth.uid in d.members; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
     function membersChanged() { return request.resource.data.members.diff(resource.data.members).affectedKeys(); }
+
+    // 내 여행 목록 (폰을 바꿔도 여행을 찾아오기 위한 색인) — 본인만
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
 
     match /trips/{tripId} {
       allow read: if isMember(resource.data);
