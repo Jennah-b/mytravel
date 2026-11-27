@@ -283,7 +283,7 @@ function homeHTML(){
   <div class="status" id="status">${esc(statusMsg)}</div>${accountHTML()}${installHTML()}
   ${list.length?list.map(t=>{const n=toBook(t).length;return`<button class="tcard" data-act="openTrip" data-id="${esc(t.id)}"><span class="n disp">${esc(t.title)}</span><span class="pill">${esc(dday(t))}</span><span class="mute">${t.shared&&Object.keys(t.shared.members||{}).length>1?`<b style="color:var(--ink)">함께 ${Object.keys(t.shared.members||{}).length}명</b> · `:''}${esc(t.dest)}${t.dest&&t.start?' · ':''}${t.start?mdj(t.start)+' → '+mdj(t.end||t.start):''}${n?` · <b style="color:var(--acc)">예약할 것 ${n}</b>`:''}</span></button>`}).join('')
   :`<div class="empty"><p>아직 여행이 없어요.<br>새 여행을 만들면 기본 체크리스트가 같이 들어가요.</p><div class="row" style="justify-content:center"><button class="btn pri" data-act="newTrip">첫 여행 만들기</button><button class="btn" data-act="sample">예시 여행 보기</button></div></div>`}
-  <p style="margin-top:28px" class="row"><button class="btn sm" data-act="joinPaste">초대 링크로 참여</button><button class="btn ghost sm" data-act="importFile">백업 파일 불러오기</button><button class="btn ghost sm" data-act="import">백업 붙여넣기</button></p>`;
+  <p style="margin-top:28px" class="row"><button class="btn sm" data-act="joinPaste">초대 링크로 참여</button><button class="btn ghost sm" data-act="importFile">백업 파일 불러오기</button><button class="btn ghost sm" data-act="import">백업 붙여넣기</button></p><p class="mute" style="text-align:center;font-size:12px;margin-top:24px">여행 수첩 ${APPV}</p>`;
 }
 function stampsHTML(t,ds){
   const td=today();
@@ -426,7 +426,7 @@ window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPro
 window.addEventListener('appinstalled',()=>{deferredPrompt=null;render()});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 /* ---------- 계정 · 같이 쓰기 (Firebase) ---------- */
-const FBV='10.12.2',CFG=window.FIREBASE_CONFIG||null;
+const APPV='v5',FBV='10.12.2',CFG=window.FIREBASE_CONFIG||null;
 let fb=null,fbUid=null,fbUser=null,fbReady=null,idxUnsub=null,afterLogin=null,loginAsked=false;const subs={},synced={},pendPh=new Set(),seen={};
 const rand=n=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789',r=new Uint32Array(n);crypto.getRandomValues(r);return[...r].map(x=>a[x%a.length]).join('')};
 const stable=o=>o===null||typeof o!=='object'?JSON.stringify(o??null):Array.isArray(o)?'['+o.map(stable).join(',')+']':'{'+Object.keys(o).filter(k=>o[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
@@ -451,7 +451,7 @@ function onUser(u){
   if(!fbUser){if(idxUnsub){idxUnsub();idxUnsub=null}for(const id in subs){subs[id]();delete subs[id]}render();return}
   if(prev===fbUid)return;
   const{F,db}=fb;
-  idxUnsub=F.onSnapshot(F.doc(db,'users',fbUid),s=>{const tr=(s.exists()&&s.data().trips)||{};for(const id in tr)if(!subs[id])sub(id)},e=>console.warn(e));
+  idxUnsub=F.onSnapshot(F.doc(db,'users',fbUid),s=>{const tr=(s.exists()&&s.data().trips)||{};for(const id in tr)if(!subs[id]&&!gone.has(id))sub(id)},e=>console.warn(e));
   Object.values(trips).forEach(t=>{if(t.shared)sub(t.id);else cloudify(t)});
   render();if(loginAsked){loginAsked=false;toast((fbUser.email||'계정')+'으로 로그인했어요')}
   if(afterLogin){const f=afterLogin;afterLogin=null;setTimeout(f,0)}}
@@ -478,10 +478,16 @@ async function emailLogin(v){const el=()=>$('#serr');if(!fb){if(el())el().textCo
 function pwReset(){const em=($('#f_email')||{}).value||'';if(!em){$('#serr').textContent='위에 이메일을 먼저 적어주세요';return}if(!fb)return;
   fb.U.sendPasswordResetEmail(fb.auth,em).then(()=>{$('#serr').textContent='비밀번호 재설정 메일을 보냈어요. 메일함을 확인해주세요'}).catch(e=>{$('#serr').textContent=authMsg(e)})}
 async function logout(){if(!fb)return;for(const id of Object.keys(trips))if(trips[id].shared)delete trips[id];ui.view='home';await persist();try{localStorage.removeItem('tripnote.name')}catch(e){}fb.U.signOut(fb.auth).then(()=>toast('로그아웃했어요'))}
-function dupGroups(){const g={};Object.values(trips).forEach(t=>{const ms=t.shared&&t.shared.members||{};if(!t.shared||t.shared.owner!==fbUid||Object.keys(ms).length!==1)return;const k=stable(toRemote(t));(g[k]=g[k]||[]).push(t)});return Object.values(g).filter(a=>a.length>1)}
-async function cleanDups(){const gs=dupGroups();let n=0;toast('정리하는 중…');
-  for(const a of gs){a.sort((x,y)=>x.id.localeCompare(y.id));for(const t of a.slice(1)){await remoteDelete(t.id,t);delete trips[t.id];n++}}
-  save();render();toast(n+'개 복사본을 지웠어요')}
+function dupGroups(){const g={};Object.values(trips).forEach(t=>{const ms=t.shared&&t.shared.members||{};if(!t.shared||t.shared.owner!==fbUid||Object.keys(ms).length!==1)return;
+  const k=[t.title,t.dest,t.start,t.end].join('|');(g[k]=g[k]||[]).push(t)});return Object.values(g).filter(a=>a.length>1)}
+function cleanDups(){const gs=dupGroups();if(!gs.length)return;
+  const list=gs.map(a=>`<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="sp">${esc(a[0].title)}</span><span class="mute">${a.length}개 → 1개</span></div>`).join('');
+  $('#sheet').innerHTML=`<h3 class="disp">복사본 정리</h3>${list}<p class="mute">같은 이름·날짜인 여행 중 내용이 제일 많은 것 하나만 남기고 나머지는 계정에서도 지워요.</p><div class="row" style="margin-top:12px"><span class="sp"></span><button class="btn" data-act="sclose">취소</button><button class="btn pri" id="yes">정리하기</button></div>`;
+  $('#veil').classList.add('on');
+  $('#yes').onclick=()=>{closeSheet();let n=0;
+    for(const a of gs){a.sort((x,y)=>stable(toRemote(y)).length-stable(toRemote(x)).length||x.id.localeCompare(y.id));
+      for(const t of a.slice(1)){delete trips[t.id];remoteDelete(t.id,t);n++}}
+    ui.view='home';save();render();toast(n+'개 복사본을 지웠어요')}}
 function accountHTML(){if(!CFG)return'';
   if(!fbUser)return`<div class="install" style="background:var(--sage);color:var(--ink)"><p>로그인하면 여행이 계정에 저장돼요. 폰을 바꿔도, 앱을 지워도 그대로예요.</p><button class="btn sm" data-act="login">로그인</button></div>`;
   const dg=dupGroups(),extra=dg.reduce((s,a)=>s+a.length-1,0);
@@ -513,7 +519,7 @@ function unshare(id,msg){stopSub(id);delete seen[id];delete synced[id];index(id,
   if(ui.pendingOpen===id){ui.pendingOpen=null;if(!t){toast('링크가 만료됐거나 잘못됐어요');render();return}}
   if(!t){render();return}
   if(t.shared){delete t.shared;const nid=renameTrip(id);save();if(fbUser&&nid)cloudify(trips[nid]);render();if(msg)toast(msg)}}
-function applyRemote(id,d){const old=trips[id],before=old?stable(toRemote(old))+stable(old.shared||null):'';
+function applyRemote(id,d){if(gone.has(id))return;const old=trips[id],before=old?stable(toRemote(old))+stable(old.shared||null):'';
   const fresh=fromRemote(id,d,old);let t=fresh;
   if(old){for(const k of['places','resv','checks','shop'])fresh[k]=reuse(old[k],fresh[k]);for(const k of Object.keys(old))if(!(k in fresh))delete old[k];Object.assign(old,fresh);t=old}
   trips[id]=t;synced[id]=toRemote(t);
@@ -562,8 +568,9 @@ async function leaveTrip(id,silent){const t=trips[id];if(!fb||!t)return;
   if(subs[id]){subs[id]();delete subs[id]}delete synced[id];index(id,false);
   if(t.shared){delete t.shared;if(!silent){const nid=renameTrip(id);save();if(nid)cloudify(trips[nid])}else save()}
   if(!silent){closeSheet();render();toast('공유에서 나왔어요. 내 여행으로 사본이 남아요')}}
-async function remoteDelete(id,t){if(!fb)return;const{F,db}=fb;if(subs[id]){subs[id]();delete subs[id]}delete synced[id];index(id,false);
-  try{await Promise.all(t.shop.filter(i=>i.photo||i.ph).map(i=>F.deleteDoc(F.doc(db,'trips',id,'photos',i.id)).catch(()=>{})));await F.deleteDoc(F.doc(db,'trips',id))}catch(e){toast('서버에서 지우지 못했어요')}}
+async function remoteDelete(id,t){if(!fb)return;const{F,db}=fb;stopSub(id);delete synced[id];delete seen[id];gone.add(id);index(id,false);
+  t.shop.filter(i=>i.photo||i.ph).forEach(i=>F.deleteDoc(F.doc(db,'trips',id,'photos',i.id)).catch(()=>{}));
+  try{await F.deleteDoc(F.doc(db,'trips',id))}catch(e){toast('서버에서 지우지 못했어요 ('+((e&&e.code)||'')+')')}}
 /* ---------- sheet ---------- */
 let sheetSave=null,sheetDel=null;
 function field(f,v){const val=v??'';
