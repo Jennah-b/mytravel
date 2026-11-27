@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>여행 수첩</title>
+<meta name="description" content="일정·장소 메모·예약·쇼핑리스트·체크리스트를 한 곳에">
+<meta name="theme-color" content="#b8401f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="여행 수첩">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: 혼자 쓰는 여행 수첩. 손으로 만든 다이어리처럼 따뜻하게, 쓰기는 빠르게.
+   IDEA: 점선 종이 위의 여행 노트 — 날짜 도장(원형 탭), 하루 한 장 티켓, 노란 메모지 체크리스트.
+   PICTURE: 선택한 날의 세이지색 티켓 카드 + 시간순 세로 타임라인.
+   COLOUR and TYPE: 종이 #f4efe6, 먹 #2a211b, 주홍 #b8401f, 세이지 #a9b89f, 머스터드 #eedb9b / Black Han Sans 제목, IBM Plex Sans KR 본문.
+   LAYOUT: 모바일 한 열, 최대 720px, 아래 고정 탭 4개. */
+:root{color-scheme:light dark;--bg:light-dark(#f4efe6,#191512);--paper:light-dark(#faf6ef,#231e1a);--ink:light-dark(#2a211b,#f1e9dc);--mute:light-dark(#7a6e64,#a99d90);--line:light-dark(#e2d9cb,#3a322b);--acc:light-dark(#b8401f,#e8744f);--sage:light-dark(#a9b89f,#3f4d3a);--mus:light-dark(#eedb9b,#5a4c22);--note:light-dark(#f7eab0,#3a3422);--noteline:light-dark(#e6d690,#4c4430);--ok:light-dark(#3f7a4a,#86c98f)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg) radial-gradient(light-dark(#e4dccd,#2a241f) 1px,transparent 1.2px) 0 0/14px 14px;color:var(--ink);font:16px/1.55 "IBM Plex Sans KR",system-ui,sans-serif;overflow-x:clip}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.wrap{max-width:720px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 130px max(16px,env(safe-area-inset-left))}
+.disp{font-family:"Black Han Sans","IBM Plex Sans KR",sans-serif;font-weight:400;letter-spacing:-.01em}
+h1{font-size:34px;line-height:1.1;margin:6px 0}
+h2{font-size:24px;line-height:1.15;margin:26px 0 6px}
+.mute{color:var(--mute);font-size:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.btn{min-height:44px;padding:0 16px;border-radius:999px;border:2px solid var(--ink);background:var(--paper);font-weight:700}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--acc)}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px;border-width:1.5px}
+.btn.danger{color:var(--acc)}
+a.btn{display:inline-grid;place-content:center;text-decoration:none;color:var(--ink)}
+.status{font-size:13px;color:var(--mute);min-height:20px}
+.pill{display:inline-block;background:var(--mus);border-radius:999px;padding:4px 14px;font-weight:700;font-size:16px;white-space:nowrap}
+/* day stamps */
+.days{display:flex;gap:0;overflow-x:auto;padding:12px 2px 14px;scroll-snap-type:x proximity;border-bottom:1.5px solid var(--line);margin-bottom:6px}
+.days .gap{flex:1 0 18px;align-self:center;border-top:3px dotted var(--line);margin:0 4px;min-width:18px}
+.stamp{flex:none;width:62px;height:62px;border-radius:50%;border:2.5px solid var(--ink);background:var(--paper);box-shadow:0 5px 0 light-dark(#d9cfbf,#0e0b09);font-size:20px;display:grid;place-content:center;scroll-snap-align:center;line-height:1}
+.stamp small{font-family:"IBM Plex Sans KR";font-size:11px;color:var(--mute);margin-top:3px}
+.stamp[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+.stamp[aria-pressed=true] small{color:#fde3d6}
+.stamp.today{border-style:dashed}
+/* day ticket */
+.ticket{background:var(--paper);border-radius:22px;overflow:clip;margin:12px 0;border:1px solid var(--line)}
+.ticket .top{background:var(--sage);padding:20px 20px 22px;position:relative}
+.ticket .top .k{font-weight:700;letter-spacing:.04em;font-size:15px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.ticket .top h2{font-size:clamp(28px,8vw,40px);margin:8px 0 6px}
+.route{font-size:15px;opacity:.85;overflow-wrap:anywhere}
+.perf{height:0;border-top:3px dashed var(--line);margin:0 18px;position:relative}
+.perf::before,.perf::after{content:"";position:absolute;top:-14px;width:26px;height:26px;border-radius:50%;background:var(--bg)}
+.perf::before{left:-31px}.perf::after{right:-31px}
+.tl{position:relative;padding:8px 16px 16px}
+.tl::before{content:"";position:absolute;left:104px;top:20px;bottom:24px;border-left:1.5px solid var(--line)}
+.ev{display:grid;grid-template-columns:76px 24px minmax(0,1fr);gap:0 6px;padding:14px 0;border-bottom:1.5px solid var(--line)}
+.ev:last-child{border-bottom:0}
+.tm{text-align:right}
+.tm b{display:block;font-size:22px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kl{display:inline-block;margin-top:6px;border:1.5px solid var(--ink);border-radius:6px;padding:1px 6px;font-size:12px;font-weight:700;letter-spacing:.08em}
+.dot{width:18px;height:18px;border-radius:50%;border:3px solid var(--ink);background:var(--paper);margin:5px auto 0;position:relative;z-index:1}
+.dot.done{background:var(--ink)}
+.chip2{display:inline-block;border:1.5px solid var(--line);border-radius:999px;padding:0 10px;font-size:13px;color:var(--mute);margin-bottom:4px}
+.ttl{border:0;background:none;padding:0;text-align:left;font-size:19px;font-weight:700;line-height:1.35;text-decoration:underline;text-decoration-color:light-dark(#d9b8a8,#6a4a3c);text-decoration-thickness:3px;text-underline-offset:4px;overflow-wrap:anywhere}
+.badge{display:inline-block;font-size:13px;font-weight:700;border-radius:6px;padding:1px 8px;margin:4px 6px 0 0;white-space:nowrap}
+.badge.need{background:light-dark(#f8dccf,#55291c);color:var(--acc)}
+.badge.ok{background:light-dark(#dce8d8,#24361f);color:var(--ok)}
+.sub{font-size:14px;color:var(--mute);margin-top:2px}
+details{margin-top:6px}
+summary{cursor:pointer;color:var(--mute);font-size:14px;list-style:none;min-height:32px;display:flex;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"⌄";margin-left:6px;font-size:16px;line-height:1}
+details[open] summary::after{content:"⌃"}
+.memo{white-space:pre-wrap;font-size:15px;overflow-wrap:anywhere;background:var(--bg);border-radius:10px;padding:8px 12px;margin:4px 0}
+.links{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.links a,.links button{min-height:36px;padding:0 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--paper);font-size:14px;display:inline-grid;place-content:center;text-decoration:none;color:var(--ink)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 18px}
+/* overview */
+.dcard{width:100%;text-align:left;background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin:10px 0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px}
+.dcard .disp{font-size:20px}
+.sum{background:var(--paper);border-radius:22px;border:1px solid var(--line);padding:18px 20px;margin:12px 0}
+.sum .big{font-size:clamp(26px,7vw,36px);line-height:1.15}
+.sum .line{border-top:2px dashed var(--line);margin:14px 0 10px}
+.todo-cta{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:light-dark(#f8dccf,#3d2018);border:0;border-radius:14px;padding:12px 14px;margin-top:10px;color:var(--ink)}
+.todo-cta b{color:var(--acc)}
+/* trip list */
+.tcard{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;width:100%;text-align:left;padding:18px;border-radius:18px;border:1px solid var(--line);background:var(--paper);margin:12px 0;box-shadow:0 4px 0 light-dark(#e3dacb,#0e0b09)}
+.tcard .n{font-size:24px;line-height:1.15}
+.tcard .pill{align-self:center;grid-row:span 2}
+/* places & resv */
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px}
+.chip{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--paper);font-size:14px}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.card{border:1px solid var(--line);border-radius:18px;background:var(--paper);padding:14px 16px;margin:10px 0}
+.card .meta{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:14px;color:var(--mute);margin-top:4px}
+.tk{display:grid;grid-template-columns:62px minmax(0,1fr);gap:12px}
+.tk .kind{border-right:2px dashed var(--line);padding-right:10px;display:grid;align-content:start;gap:2px;font-size:18px}
+.tk .kind small{font-family:"IBM Plex Sans KR";font-size:12px;color:var(--mute);white-space:nowrap}
+.code{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.code span{font-family:ui-monospace,Menlo,monospace;font-size:17px;font-weight:700;letter-spacing:.04em;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 10px;overflow-wrap:anywhere}
+.warn{color:var(--acc);font-size:13px;font-weight:700}
+/* note paper */
+.note{background:var(--note);border-radius:4px;padding:16px 18px 10px;margin:14px 0;box-shadow:0 3px 0 light-dark(#e0d29a,#14110a)}
+.note h3{margin:0 0 4px;font-size:22px;display:flex;justify-content:space-between;align-items:baseline}
+.note h3 small{font-family:"IBM Plex Sans KR";font-size:15px;color:var(--mute);font-weight:400}
+.ci{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:start;padding:12px 0;border-bottom:2px solid var(--noteline)}
+.ci:last-of-type{border-bottom:0}
+.ci input{width:26px;height:26px;margin:2px 0 0;accent-color:var(--acc)}
+.ci .tx{font-size:17px;overflow-wrap:anywhere}
+.ci.done .tx{text-decoration:line-through;color:var(--mute)}
+.ci .x{border:0;background:none;color:var(--mute);width:36px;height:36px;font-size:20px}
+.ci .open{border:0;background:none;padding:0;text-align:left;width:100%}
+.addrow{display:flex;gap:8px;margin:10px 0 4px}
+.addrow input{flex:1;background:light-dark(#fffbe6,#2a2619)}
+input[type=text],input[type=date],input[type=time],input[type=url],select,textarea{width:100%;min-height:44px;font-size:16px;border:1.5px solid var(--line);border-radius:12px;padding:8px 12px;background:var(--paper)}
+textarea{min-height:96px;resize:vertical}
+.bar{height:8px;border-radius:8px;background:var(--line);overflow:hidden;margin:4px 0}
+.bar i{display:block;height:100%;background:var(--ok)}
+.empty{text-align:center;padding:30px 12px;color:var(--mute)}
+/* tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--paper);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,minmax(0,1fr));z-index:5;padding-bottom:env(safe-area-inset-bottom)}
+.tabs button{min-height:64px;border:0;background:none;font-size:14px;color:var(--mute);display:grid;place-items:center;align-content:center;gap:2px}
+.tabs svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tabs button[aria-selected=true]{color:var(--acc);font-weight:700}
+.tabs .n{font-size:11px;background:var(--acc);color:#fff;border-radius:999px;padding:0 6px;margin-left:2px}
+/* shopping */
+.shop{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border-radius:18px;background:var(--paper);border:1px solid var(--line);margin:10px 0}
+.shop.done{opacity:.55}.shop.done .ttl{text-decoration:line-through;color:var(--mute)}
+.thumb{width:72px;height:72px;border-radius:14px;overflow:hidden;border:0;padding:0;background:var(--sage);display:grid;place-content:center}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb svg{width:30px;height:30px;fill:none;stroke:var(--ink);stroke-width:1.6;opacity:.6}
+.store{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700;color:var(--acc);background:light-dark(#f8dccf,#3d2018);border-radius:6px;padding:1px 8px;margin-bottom:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shop .open{border:0;background:none;padding:0;text-align:left;width:100%}
+.shop .ttl{font-size:17px;text-decoration:none}
+.clip{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14px;color:var(--mute);white-space:pre-wrap}
+.sact{display:flex;gap:2px}
+.sact button{width:40px;height:40px;border:0;background:none;border-radius:10px;display:grid;place-content:center}
+.sact svg{width:22px;height:22px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sact .ck svg{stroke:var(--ok)}.sact .ck.on svg{fill:var(--ok);stroke:var(--ok)}.sact .ck.on svg path{stroke:var(--paper)}
+.sact .del svg{stroke:var(--mute)}
+.chip .n{opacity:.6;margin-left:4px;font-size:12px}
+.photo{width:100%;height:150px;border:2px dashed var(--line);border-radius:16px;background:var(--bg);display:grid;place-content:center;text-align:center;color:var(--mute);font-size:14px;position:relative;overflow:hidden;cursor:pointer}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo .rm{position:absolute;top:8px;right:8px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(0,0,0,.55);color:#fff;font-size:18px}
+.schips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.install{display:flex;gap:10px;align-items:center;background:var(--ink);color:var(--bg);border-radius:16px;padding:12px 14px;margin:10px 0}
+.install p{margin:0;flex:1;font-size:14px}
+.install .btn{border-color:var(--bg);background:var(--bg);color:var(--ink)}
+/* sheet */
+.veil{position:fixed;inset:0;background:rgba(20,14,10,.5);z-index:20;display:none;align-items:flex-end;justify-content:center}
+.veil.on{display:flex}
+.sheet{background:var(--paper);width:100%;max-width:720px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:18px 18px 28px}
+.sheet h3{margin:0 0 12px;font-size:22px}
+.f{margin:10px 0}.f label{display:block;font-size:14px;color:var(--mute);margin-bottom:4px}
+.f.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin:0}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+@media(max-width:400px){.ev{grid-template-columns:62px 22px minmax(0,1fr)}.tl::before{left:88px}.tm b{font-size:19px}.stamp{width:56px;height:56px;font-size:18px}}
+</style></head><body>
+<div class="wrap" id="app"><p class="mute">불러오는 중…</p></div>
+<nav class="tabs" id="tabs" hidden></nav>
+<div class="veil" id="veil"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" role="status"></div>
+<script src="firebase-config.js"></script>
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4);
+const TAGS=['맛집','카페','관광','쇼핑','숙소','기타'];
+const KINDS=['항공','숙소','투어','교통','식당','티켓','기타'];
+const KL={항공:'FLY',교통:'MOVE',숙소:'STAY',맛집:'EAT',식당:'EAT',카페:'CAFE',관광:'SEE',투어:'SEE',쇼핑:'SHOP',티켓:'TICKET',기타:'ETC'};
+const WD=['일','월','화','수','목','금','토'],WDJ=['日','月','火','水','木','金','土'];
+let trips={},ui={view:'home',id:null,tab:'plan',day:'all',tag:'전체'},mode='loading',col=null,statusMsg='';
+const dirty=new Set(),gone=new Set(),timers={},writing={},ver={};
+
+/* ---------- dates ---------- */
+const pd=s=>{if(!s)return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>iso(new Date());
+const md=s=>{const d=pd(s);return d?(d.getMonth()+1)+'/'+d.getDate()+' ('+WD[d.getDay()]+')':''};
+const mdj=s=>{const d=pd(s);return d?(d.getMonth()+1)+'.'+d.getDate()+' '+WDJ[d.getDay()]:''};
+const diff=(a,b)=>Math.round((pd(b)-pd(a))/864e5);
+function days(t){const out=[];if(!t.start)return out;const e=t.end||t.start;let d=pd(t.start);for(let i=0;i<40&&iso(d)<=e;i++){out.push(iso(d));d.setDate(d.getDate()+1)}return out}
+function dday(t){const td=today();if(!t.start)return'날짜 미정';if(td<t.start)return'D-'+diff(td,t.start);if(td<=(t.end||t.start))return(diff(t.start,td)+1)+'일차';return'다녀옴'}
+
+/* ---------- storage (이 기기: IndexedDB) ---------- */
+const LKEY='tripnote.v1';
+const idb={db:null,
+  open(){return new Promise((res,rej)=>{if(!('indexedDB' in window))return rej(new Error('no idb'));const r=indexedDB.open('tripnote',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{this.db=r.result;res()};r.onerror=()=>rej(r.error)})},
+  get(k){return new Promise((res,rej)=>{const q=this.db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
+  set(k,v){return new Promise((res,rej)=>{const tx=this.db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error)})}};
+function loadLocal(){try{trips=JSON.parse(localStorage.getItem(LKEY)||'{}')||{}}catch(e){trips={}}}
+async function init(){
+  try{await idb.open();mode='idb';trips=(await idb.get('trips'))||{};if(!Object.keys(trips).length)loadLocal()}
+  catch(e){mode='local';loadLocal()}
+  migrateLegacy();render();startSync();
+  try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
+}
+let saveT;
+function save(id){clearTimeout(saveT);saveT=setTimeout(persist,250);if(id)pushDiff(id)}
+async function persist(){clearTimeout(saveT);
+  try{if(mode==='idb')await idb.set('trips',JSON.parse(JSON.stringify(trips)));else localStorage.setItem(LKEY,JSON.stringify(trips));setStatus('')}
+  catch(e){setStatus('저장 공간이 부족해요');toast('저장하지 못했어요. 사진을 몇 개 지워주세요')}}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&saveT)persist()});
+/* 예전 ‘Fukuoka Shopping’ 앱 데이터가 같은 주소에 있으면 자동으로 옮겨요 */
+function migrateLegacy(){try{
+  if(localStorage.getItem('tripnote.migrated'))return;
+  const arr=JSON.parse(localStorage.getItem('fukuoka_items')||'[]');
+  if(Array.isArray(arr)&&arr.length){const id=newTrip({title:'후쿠오카',dest:'후쿠오카, 일본'});trips[id].shop=arr.map(cleanShop);try{trips[id].shopFilter=localStorage.getItem('fukuoka_filter')||'ALL'}catch(e){}save();toast('예전 쇼핑리스트를 ‘후쿠오카’ 여행으로 옮겼어요')}
+  localStorage.setItem('tripnote.migrated','1')}catch(e){}}
+const okImg=v=>typeof v==='string'&&/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(v)?v:null;
+function cleanShop(i){return{id:String(i.id||uid()).replace(/[^\w-]/g,'')||uid(),name:String(i.name||''),store:String(i.store||''),memo:String(i.memo||''),photo:okImg(i.photo),checked:!!i.checked,createdAt:Number(i.createdAt)||Date.now()}}
+function setStatus(m){statusMsg=m;const s=$('#status');if(s)s.textContent=m}
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2200)}
+
+/* ---------- helpers ---------- */
+const T=()=>trips[ui.id];
+const touch=()=>{save(ui.id);render()};
+function norm(t){t.places=t.places||[];t.resv=t.resv||[];t.checks=t.checks||[];t.dayInfo=t.dayInfo||{};t.shop=t.shop||[];t.checks.forEach((c,i)=>{if(!c.createdAt)c.createdAt=i+1});t.resv.forEach(r=>{if(!r.status)r.status='booked'});return t}
+function defaultChecks(){return[['출발 전','여권 유효기간 확인'],['출발 전','환전 / 트래블카드'],['출발 전','eSIM · 로밍'],['출발 전','여행자보험'],['출발 전','입국신고 · 비자 확인'],['짐','충전기 · 보조배터리'],['짐','멀티어댑터'],['짐','상비약'],['짐','세면도구'],['짐','옷 · 잠옷']].map(([sec,text])=>({id:uid(),sec,text,done:false}))}
+function newTrip(v){const id=uid();trips[id]={id,title:v.title||'새 여행',dest:v.dest||'',start:v.start||'',end:v.end||v.start||'',places:[],resv:[],checks:defaultChecks(),dayInfo:{},shop:[]};save(id);return id}
+const q=(p,t)=>p.name+(t.dest?' '+t.dest:'');
+const mapUrl=(p,t)=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q(p,t));
+function routeUrl(ps,t){if(!ps.length)return'';if(ps.length===1)return mapUrl(ps[0],t);
+  const e=s=>encodeURIComponent(s),mid=ps.slice(1,-1).slice(0,8).map(p=>q(p,t)).join('|');
+  return'https://www.google.com/maps/dir/?api=1&travelmode=transit&origin='+e(q(ps[0],t))+'&destination='+e(q(ps[ps.length-1],t))+(mid?'&waypoints='+e(mid):'')}
+const safeUrl=u=>/^https:\/\//i.test(u||'')?u:'';
+/* booking to-do: reservations marked 'need' + places flagged */
+function toBook(t){
+  const a=t.resv.filter(r=>r.status==='need').map(r=>({type:'r',ref:r,title:r.title,kind:r.kind,use:r.date,by:r.by,url:r.url}));
+  const b=t.places.filter(p=>p.needBook&&!p.booked).map(p=>({type:'p',ref:p,title:p.name,kind:p.tag,use:p.day,by:p.bookBy,url:p.url}));
+  return[...a,...b].sort((x,y)=>(x.by||x.use||'9').localeCompare(y.by||y.use||'9'));
+}
+function dayItems(t,d){
+  const it=[...t.places.filter(p=>p.day===d).map(p=>({type:'p',time:p.time||'',o:p.order||0,ref:p})),...t.resv.filter(r=>r.date===d).map(r=>({type:'r',time:r.time||'',o:0,ref:r}))];
+  return it.sort((a,b)=>a.time&&b.time?a.time.localeCompare(b.time):a.time?-1:b.time?1:a.o-b.o);
+}
+function nextUp(t){
+  const td=today(),now=new Date().toTimeString().slice(0,5);
+  const all=days(t).flatMap(d=>dayItems(t,d).map(x=>({...x,d}))).filter(x=>(x.d>td||(x.d===td&&(!x.time||x.time>=now)))&&!(x.type==='p'&&x.ref.done));
+  const n=all[0];if(!n)return'';
+  return`<b>${n.d===td?'오늘':md(n.d)}</b> ${n.time?esc(n.time)+' · ':''}${esc(n.type==='p'?n.ref.name:n.ref.title)}`;
+}
+const ICON={shop:'<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 10V6.5a3 3 0 0 1 6 0V10"/></svg>',plan:'<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17M8 14h5M8 17h8"/></svg>',places:'<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',resv:'<svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2a2.5 2.5 0 0 0 0 5v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2.5 2.5 0 0 0 0-5z"/><path d="M14 5v14" stroke-dasharray="2 2"/></svg>',checks:'<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8 12 3 3 5-6"/></svg>'};
+
+/* ---------- render ---------- */
+function render(){
+  const app=$('#app'),tabs=$('#tabs');
+  if(mode==='loading'){tabs.hidden=true;app.innerHTML='<p class="mute">불러오는 중…</p>';return}
+  if(ui.view==='trip'&&!T())ui.view='home';
+  if(ui.view==='home'){tabs.hidden=true;app.innerHTML=homeHTML();return}
+  const t=norm(T()),need=toBook(t).length,ck=t.checks.filter(c=>c.done).length;
+  tabs.hidden=false;
+  tabs.innerHTML=[['plan','일정',''],['places','장소',''],['resv','예약',need?`<span class="n">${need}</span>`:''],['shop','쇼핑',''],['checks','체크','']]
+    .map(([k,l,n])=>`<button data-act="tab" data-k="${k}" aria-selected="${ui.tab===k}">${ICON[k]}<span>${l}${n}</span></button>`).join('');
+  app.innerHTML=`<div class="row"><button class="btn ghost sm" data-act="home" style="padding-left:0">← 내 여행</button><span class="sp"></span><span class="status" id="status">${esc(statusMsg)}</span><button class="btn sm" data-act="tripMenu">설정</button></div>
+  <div class="row" style="margin-top:4px"><h1 class="disp sp">${esc(t.title)}</h1>${t.shared?`<button class="pill" style="background:var(--sage);border:0" data-act="tripMenu">함께 ${Object.keys(t.shared.members||{}).length}명</button>`:''}<span class="pill">${esc(dday(t))}</span></div>
+  ${({plan:planHTML,places:placesHTML,resv:resvHTML,checks:checksHTML,shop:shopHTML})[ui.tab](t)}`;
+  if(ui.tab==='plan'){const s=document.querySelector('.stamp[aria-pressed=true]');if(s)s.scrollIntoView({block:'nearest',inline:'center'})}
+}
+function homeHTML(){
+  const td=today(),list=Object.values(trips).map(norm).sort((a,b)=>{const pa=(a.end||a.start||'9')<td,pb=(b.end||b.start||'9')<td;return pa!==pb?(pa?1:-1):(pa?(b.start||'').localeCompare(a.start||''):(a.start||'9').localeCompare(b.start||'9'))});
+  return`<div class="row"><h1 class="disp sp">내 여행 수첩</h1><button class="btn pri" data-act="newTrip">+ 새 여행</button></div>
+  <div class="status" id="status">${esc(statusMsg)}</div>${installHTML()}
+  ${list.length?list.map(t=>{const n=toBook(t).length;return`<button class="tcard" data-act="openTrip" data-id="${esc(t.id)}"><span class="n disp">${esc(t.title)}</span><span class="pill">${esc(dday(t))}</span><span class="mute">${t.shared?`<b style="color:var(--ink)">함께 ${Object.keys(t.shared.members||{}).length}명</b> · `:''}${esc(t.dest)}${t.dest&&t.start?' · ':''}${t.start?mdj(t.start)+' → '+mdj(t.end||t.start):''}${n?` · <b style="color:var(--acc)">예약할 것 ${n}</b>`:''}</span></button>`}).join('')
+  :`<div class="empty"><p>아직 여행이 없어요.<br>새 여행을 만들면 기본 체크리스트가 같이 들어가요.</p><div class="row" style="justify-content:center"><button class="btn pri" data-act="newTrip">첫 여행 만들기</button><button class="btn" data-act="sample">예시 여행 보기</button></div></div>`}
+  <p style="margin-top:28px" class="row"><button class="btn sm" data-act="joinPaste">초대 링크로 참여</button><button class="btn ghost sm" data-act="importFile">백업 파일 불러오기</button><button class="btn ghost sm" data-act="import">백업 붙여넣기</button></p>`;
+}
+function stampsHTML(t,ds){
+  const td=today();
+  return`<div class="days" role="group" aria-label="날짜 선택"><button class="stamp disp" data-act="day" data-d="all" aria-pressed="${ui.day==='all'}">전체</button>${ds.map((d,i)=>`<span class="gap"></span><button class="stamp disp${d===td?' today':''}" data-act="day" data-d="${d}" aria-pressed="${ui.day===d}">D${i+1}<small>${md(d).split(' ')[0]}</small></button>`).join('')}</div>`;
+}
+function planHTML(t){
+  const ds=days(t);
+  if(!ds.length)return`<div class="empty"><p>여행 날짜를 정하면 날짜별 일정이 생겨요.</p><button class="btn pri" data-act="editTrip">날짜 정하기</button></div>`;
+  if(ui.day!=='all'&&!ds.includes(ui.day))ui.day='all';
+  return stampsHTML(t,ds)+(ui.day==='all'?overviewHTML(t,ds):dayHTML(t,ds,ui.day));
+}
+function overviewHTML(t,ds){
+  const nb=toBook(t),nx=nextUp(t),box=t.places.filter(p=>!p.day||!ds.includes(p.day));
+  return`<section class="sum"><div class="mute">${esc(t.dest||'여행지')} · ${ds.length-1}박 ${ds.length}일</div><div class="big disp">${mdj(ds[0])} → ${mdj(ds[ds.length-1])}</div>
+  ${nx?`<div class="line"></div><div class="mute">다음 일정</div><div>${nx}</div>`:''}
+  ${nb.length?`<button class="todo-cta" data-act="tab" data-k="resv"><span><b>예약할 것 ${nb.length}개</b> 남았어요${nb[0].by?` · 가장 급한 건 ${md(nb[0].by)}까지`:''}</span><span>→</span></button>`:''}</section>
+  ${ds.map((d,i)=>{const it=dayItems(t,d),info=t.dayInfo[d]||{};const tms=it.filter(x=>x.time).map(x=>x.time);
+    return`<button class="dcard" data-act="day" data-d="${d}"><span class="disp">DAY ${i+1}${info.title?' · '+esc(info.title):''}</span><span class="mute">${mdj(d)}</span>
+    <span class="mute" style="grid-column:1/-1">${it.length?esc(it.slice(0,5).map(x=>x.type==='p'?x.ref.name:x.ref.title).join(' → '))+(it.length>5?' …':''):'아직 비어 있어요'}</span>
+    <span class="mute" style="grid-column:1/-1">${it.length}곳${tms.length?' · '+tms[0]+(tms.length>1?' – '+tms[tms.length-1]:''):''}${it.some(x=>needOf(x))?' · <b style="color:var(--acc)">예약 필요 있음</b>':''}</span></button>`}).join('')}
+  <h2 class="disp">가고 싶은 곳 보관함 <span class="mute">${box.length}곳</span></h2>
+  ${box.length?box.map(p=>`<div class="card"><button class="ttl" data-act="editPlace" data-id="${esc(p.id)}">${esc(p.name)}</button><div class="meta"><span>${esc(p.tag)}</span>${p.memo?`<span>${esc(p.memo.split('\n')[0])}</span>`:''}</div></div>`).join(''):'<p class="mute">날짜 안 정한 장소가 여기 모여요.</p>'}
+  <button class="btn sm" data-act="addPlace">+ 장소 추가</button>`;
+}
+const needOf=x=>x.type==='r'?x.ref.status==='need':(x.ref.needBook&&!x.ref.booked);
+function evHTML(x,t){
+  const r=x.ref,isP=x.type==='p',kind=isP?r.tag:r.kind,u=safeUrl(r.url),need=needOf(x);
+  const okBadge=isP?(r.needBook&&r.booked):(r.status==='booked'&&r.code);
+  const det=isP?[r.hours&&'영업 '+esc(r.hours),r.cost&&'예상 '+esc(r.cost)]:[r.code&&'예약번호 '+esc(r.code),r.price&&esc(r.price)];
+  const hasDet=r.memo||det.some(Boolean)||u||isP;
+  return`<div class="ev"><div class="tm">${x.time?`<b>${esc(x.time)}</b>`:'<b class="mute">--:--</b>'}<span class="kl">${KL[kind]||'ETC'}</span></div><div class="dot${isP&&r.done?' done':''}"></div>
+  <div><span class="chip2">${esc(kind)}</span><br><button class="ttl" data-act="${isP?'editPlace':'editResv'}" data-id="${esc(r.id)}">${esc(isP?r.name:r.title)}</button>
+  <div>${need?'<span class="badge need">예약 필요</span>':''}${okBadge?'<span class="badge ok">예약 완료</span>':''}${isP&&r.done?'<span class="badge ok">다녀옴</span>':''}</div>
+  ${hasDet?`<details><summary>자세히</summary>${det.filter(Boolean).length?`<div class="sub">${det.filter(Boolean).join(' · ')}</div>`:''}${r.memo?`<div class="memo">${esc(r.memo)}</div>`:''}
+  <div class="links">${isP?`<a href="${mapUrl(r,t)}" target="_blank" rel="noopener">구글맵 ↗</a>`:''}${u?`<a href="${esc(u)}" target="_blank" rel="noopener">링크 ↗</a>`:''}${!isP&&r.code?`<button data-act="copy" data-v="${esc(r.code)}">예약번호 복사</button>`:''}${isP?`<button data-act="toggleDone" data-id="${esc(r.id)}">${r.done?'안 갔어요':'다녀왔어요'}</button>`:''}</div></details>`:''}</div></div>`;
+}
+function dayHTML(t,ds,d){
+  const i=ds.indexOf(d),it=dayItems(t,d),info=t.dayInfo[d]||{},tms=it.filter(x=>x.time).map(x=>x.time);
+  const ps=it.filter(x=>x.type==='p').map(x=>x.ref),ru=routeUrl(ps,t);
+  return`<section class="ticket"><div class="top"><div class="k"><span>DAY ${i+1} · ${mdj(d)}${d===today()?' · 오늘':''}</span><span>${tms.length?tms[0]+(tms.length>1?' – '+tms[tms.length-1]:''):''}</span></div>
+  <h2 class="disp">${esc(info.title||'DAY '+(i+1))}</h2>
+  <div class="route">${it.length?esc(it.map(x=>x.type==='p'?x.ref.name:x.ref.title).join(' → ')):'아직 일정이 없어요'}</div>
+  <div class="row" style="margin-top:12px">${ru?`<a class="btn sm" href="${esc(ru)}" target="_blank" rel="noopener">${ps.length>1?'오늘 동선 구글맵 ↗':'구글맵 ↗'}</a>`:''}<button class="btn sm" data-act="dayInfo" data-d="${d}">제목·메모</button></div>
+  ${info.memo?`<div class="memo" style="margin-top:12px;background:rgba(255,255,255,.35)">${esc(info.memo)}</div>`:''}</div>
+  <div class="perf" aria-hidden="true"></div>
+  <div class="tl">${it.length?it.map(x=>evHTML(x,t)).join(''):'<p class="mute" style="padding:12px 0 0 0">아래 버튼으로 장소나 예약을 넣어보세요.</p>'}</div>
+  <div class="tools"><button class="btn sm" data-act="addToDay" data-d="${d}">+ 장소</button><button class="btn sm" data-act="addResvDay" data-d="${d}">+ 예약·이동</button></div></section>
+  <p class="mute">시간을 넣은 항목은 시간순으로, 시간 없는 항목은 맨 아래에 놓여요.</p>`;
+}
+function placesHTML(t){
+  const f=ui.tag,ds=days(t),list=t.places.filter(p=>f==='전체'||(f==='예약 필요'?p.needBook&&!p.booked:p.tag===f)).sort((a,b)=>(a.day||'~').localeCompare(b.day||'~')||(a.time||'99').localeCompare(b.time||'99'));
+  return`<div class="row" style="margin-top:14px"><h2 class="disp sp" style="margin:0">장소 메모</h2><button class="btn pri" data-act="addPlace">+ 장소</button></div>
+  <div class="chips">${['전체','예약 필요',...TAGS].map(g=>`<button class="chip" data-act="tag" data-k="${g}" aria-pressed="${f===g}">${g}</button>`).join('')}</div>
+  ${list.length?list.map(p=>{const di=ds.indexOf(p.day),u=safeUrl(p.url);return`<article class="card"><span class="chip2">${esc(p.tag)}</span><br><button class="ttl" data-act="editPlace" data-id="${esc(p.id)}">${esc(p.name)}</button>
+  <div>${p.needBook?`<span class="badge ${p.booked?'ok':'need'}">${p.booked?'예약 완료':'예약 필요'}</span>`:''}</div>
+  ${p.memo?`<div class="memo">${esc(p.memo)}</div>`:''}
+  <div class="meta"><span>${di>=0?'D'+(di+1)+' '+md(p.day)+(p.time?' '+esc(p.time):''):'보관함'}</span>${p.hours?`<span>영업 ${esc(p.hours)}</span>`:''}${p.cost?`<span>예상 ${esc(p.cost)}</span>`:''}</div>
+  <div class="links"><a href="${mapUrl(p,t)}" target="_blank" rel="noopener">구글맵 ↗</a>${u?`<a href="${esc(u)}" target="_blank" rel="noopener">링크 ↗</a>`:''}</div></article>`}).join('')
+  :`<div class="empty"><p>${f==='전체'?'장소를 추가하고 메모를 남겨보세요.<br>“현금만 받음”, “2층 창가”, “이거 시키기” 같은 것들.':esc(f)+'인 장소가 없어요.'}</p></div>`}`;
+}
+function resvHTML(t){
+  const td=today(),nb=toBook(t),booked=t.resv.filter(r=>r.status!=='need').sort((a,b)=>((a.date||'9')+(a.time||'')).localeCompare((b.date||'9')+(b.time||'')));
+  const total=booked.reduce((s,r)=>s+(parseFloat(String(r.price||'').replace(/[^0-9.]/g,''))||0),0);
+  const dl=by=>{if(!by)return'';const n=diff(td,by);return n<0?`<span class="warn">기한 지남 (${md(by)})</span>`:`<span class="${n<=3?'warn':''}">${n===0?'오늘까지':md(by)+'까지'}${n>0&&n<=3?' · '+n+'일 남음':''}</span>`};
+  return`<section class="note"><h3 class="disp">예약해야 할 것 <small>${nb.length}개 남음</small></h3>
+  ${nb.length?nb.map(x=>`<div class="ci"><input type="checkbox" data-act="bookDone" data-type="${x.type}" data-id="${esc(x.ref.id)}" aria-label="${esc(x.title)} 예약 완료로 표시">
+  <button class="open" data-act="${x.type==='p'?'editPlace':'editResv'}" data-id="${esc(x.ref.id)}"><div class="tx">${esc(x.title)}</div><div class="sub">${esc(x.kind)}${x.use?' · 이용 '+md(x.use):''}${x.by?' · ':''}${dl(x.by)}</div></button>
+  ${safeUrl(x.url)?`<a class="btn sm" href="${esc(x.url)}" target="_blank" rel="noopener">예약하기</a>`:'<span></span>'}</div>`).join('')
+  :'<p class="mute" style="margin:8px 0 14px">다 했어요. 예약할 게 생기면 추가하세요.</p>'}
+  <form class="addrow" data-kind="tobook"><input type="text" placeholder="예: 디즈니 1일권 2장" aria-label="예약할 것 추가"><button class="btn sm">추가</button></form>
+  <p class="mute" style="margin:4px 0 6px">체크하면 아래 ‘예약 완료’로 옮겨지고 예약번호를 적을 수 있어요. 장소에서 ‘예약 필요’를 켜도 여기 모여요.</p></section>
+  <div class="row" style="margin-top:18px"><h2 class="disp sp" style="margin:0">예약 완료</h2><button class="btn pri" data-act="addResv">+ 예약</button></div>
+  ${booked.length?`<p class="mute">${booked.filter(r=>!r.paid).length}건 결제 전${total?' · 금액 합계 '+total.toLocaleString('ko-KR'):''}</p>`:''}
+  ${booked.length?booked.map(r=>{const u=safeUrl(r.url);let w='';if(r.cancelBy&&r.cancelBy>=td){const n=diff(td,r.cancelBy);if(n<=3)w=`<div class="warn">무료 취소 ${n?n+'일 남음':'오늘까지'} (${md(r.cancelBy)})</div>`}
+  return`<article class="card tk"><div class="kind disp">${esc(r.kind)}<small>${r.date?md(r.date):'날짜 미정'}</small><small>${esc(r.time)}</small></div>
+  <div><button class="ttl" data-act="editResv" data-id="${esc(r.id)}">${esc(r.title)}</button>
+  <div class="row" style="margin-top:4px">${r.price?`<span class="mute">${esc(r.price)}</span>`:''}<span class="badge ${r.paid?'ok':'need'}">${r.paid?'결제 완료':'결제 전'}</span>${r.cancelBy?`<span class="mute">취소 기한 ${md(r.cancelBy)}</span>`:''}</div>
+  ${r.code?`<div class="code"><span>${esc(r.code)}</span><button class="btn sm" data-act="copy" data-v="${esc(r.code)}">복사</button></div>`:''}
+  ${w}${r.memo?`<div class="memo">${esc(r.memo)}</div>`:''}${u?`<div class="links"><a href="${esc(u)}" target="_blank" rel="noopener">바우처 / 예약 페이지 ↗</a></div>`:''}</div></article>`}).join('')
+  :`<div class="empty"><p>항공·숙소·티켓 예약을 모아두면<br>예약번호를 한 번에 복사할 수 있어요.</p></div>`}`;
+}
+function checksHTML(t){
+  const secs=[...new Set(t.checks.map(c=>c.sec))];if(!secs.length)secs.push('출발 전','짐');
+  const n=t.checks.length,dn=t.checks.filter(c=>c.done).length;
+  return`<div class="row" style="margin-top:14px"><h2 class="disp sp" style="margin:0">체크리스트</h2><span class="mute">${dn} / ${n}</span></div><div class="bar"><i style="width:${n?dn/n*100:0}%"></i></div>
+  ${secs.map(s=>{const it=t.checks.filter(c=>c.sec===s);return`<section class="note"><h3 class="disp">${esc(s)} <small>${it.filter(c=>c.done).length}/${it.length}</small></h3>${it.map(c=>`<div class="ci${c.done?' done':''}"><input type="checkbox" id="c_${esc(c.id)}" data-act="check" data-id="${esc(c.id)}" ${c.done?'checked':''}><label class="tx" for="c_${esc(c.id)}">${esc(c.text)}</label><button class="x" data-act="delCheck" data-id="${esc(c.id)}" aria-label="삭제">×</button></div>`).join('')}
+  <form class="addrow" data-sec="${esc(s)}"><input type="text" placeholder="${esc(s)}에 추가" aria-label="${esc(s)} 항목 추가"><button class="btn sm">추가</button></form></section>`}).join('')}
+  <div class="row" style="margin-top:20px"><button class="btn sm" data-act="newSec">+ 새 그룹</button><button class="btn sm" data-act="resetChecks">체크 모두 해제</button></div>`;
+}
+
+/* ---------- shopping ---------- */
+const NOSTORE='__none__';
+const BAG='<svg viewBox="0 0 24 24"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 10V6.5a3 3 0 0 1 6 0V10"/></svg>';
+function storeMap(t){const m={};t.shop.forEach(i=>{const k=i.store||NOSTORE;m[k]=(m[k]||0)+1});return m}
+function storeNames(t){return Object.keys(storeMap(t)).filter(k=>k!==NOSTORE).sort((a,b)=>a.localeCompare(b,'ko'))}
+function shopHTML(t){
+  const m=storeMap(t),names=storeNames(t);let f=t.shopFilter||'ALL';if(f!=='ALL'&&!m[f])f=t.shopFilter='ALL';
+  const vis=f==='ALL'?t.shop:t.shop.filter(i=>(i.store||NOSTORE)===f),done=vis.filter(i=>i.checked);
+  const list=[...vis.filter(i=>!i.checked),...done];
+  const chip=(k,l,n)=>`<button class="chip" data-act="shopFilter" data-k="${esc(k)}" aria-pressed="${f===k}">${esc(l)}<span class="n">${n}</span></button>`;
+  return`<div class="row" style="margin-top:14px"><h2 class="disp sp" style="margin:0">쇼핑리스트</h2><button class="btn pri" data-act="addShop">+ 아이템</button></div>
+  <p class="mute" style="margin:6px 0 0">${vis.length}개 아이템${done.length?' · '+done.length+'개 완료':''}</p>
+  ${names.length?`<div class="chips">${chip('ALL','전체',t.shop.length)}${names.map(n=>chip(n,n,m[n])).join('')}${m[NOSTORE]?chip(NOSTORE,'미지정',m[NOSTORE]):''}</div>`:''}
+  ${list.length?list.map(i=>`<article class="shop${i.checked?' done':''}"><button class="thumb" data-act="editShop" data-id="${esc(i.id)}" aria-label="${esc(i.name)} 수정">${okImg(i.photo)?`<img src="${i.photo}" alt="">`:BAG}</button>
+  <button class="open" data-act="editShop" data-id="${esc(i.id)}">${i.store?`<span class="store">${esc(i.store)}</span><br>`:''}<span class="ttl">${esc(i.name)}</span>${i.memo?`<div class="clip">${esc(i.memo)}</div>`:''}</button>
+  <div class="sact"><button class="ck${i.checked?' on':''}" data-act="shopCheck" data-id="${esc(i.id)}" aria-label="${i.checked?'구매 취소':'구매 완료'}" aria-pressed="${!!i.checked}"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg></button>
+  <button class="del" data-act="shopDel" data-id="${esc(i.id)}" aria-label="삭제"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button></div></article>`).join('')
+  :`<div class="empty">${t.shop.length?'<p>이 구매처에 담긴 게 없어요.</p>':'<p>쇼핑리스트가 비어 있어요.<br>사고 싶은 아이템을 사진과 함께 담아두세요.</p><button class="btn pri" data-act="addShop">첫 아이템 담기</button>'}</div>`}`;
+}
+let curPhoto=null,photoTouched=false;
+function photoBox(){$('#photoBox').innerHTML=curPhoto?`<img src="${curPhoto}" alt=""><button type="button" class="rm" data-act="rmPhoto" aria-label="사진 지우기">×</button>`:'사진 추가<br><small>탭해서 찍거나 고르기</small>'}
+function shopForm(i){const t=T();curPhoto=i?okImg(i.photo):null;photoTouched=false;
+  const pre=!i&&t.shopFilter&&t.shopFilter!=='ALL'&&t.shopFilter!==NOSTORE?t.shopFilter:'';
+  const names=storeNames(t);
+  openSheet(i?'아이템 수정':'아이템 추가',[{k:'name',l:'아이템 이름 *',ph:'예: 멘타이코 (명란젓)'},{k:'store',l:'구매처',ph:'예: 돈키호테 나카스점'},{k:'memo',l:'메모',type:'textarea',ph:'예: 선물용 3개, 1000엔 이하'}],
+  i||{store:pre},v=>{if(!v.name)return'아이템 이름을 적어주세요';
+    if(i){Object.assign(i,{name:v.name,store:v.store,memo:v.memo});if(photoTouched){i.photo=curPhoto;i._pend=false}}else t.shop.unshift({id:uid(),name:v.name,store:v.store,memo:v.memo,photo:curPhoto,checked:false,createdAt:Date.now()});touch()},
+  i?()=>confirmSheet('이 아이템을 삭제할까요?','삭제',()=>{t.shop=t.shop.filter(x=>x!==i);touch()}):null,
+  `<div class="f"><label>사진</label><label class="photo" id="photoBox" for="photoIn"></label><input type="file" id="photoIn" accept="image/*" hidden></div>`);
+  photoBox();
+  if(names.length){const st=$('#f_store');st.insertAdjacentHTML('afterend',`<div class="schips">${names.map(n=>`<button type="button" class="chip" data-act="storePick" data-v="${esc(n)}">${esc(n)}</button>`).join('')}</div>`)}
+}
+function compress(file){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{const max=600;let w=img.naturalWidth,h=img.naturalHeight;if(w>h){if(w>max){h=h*max/w;w=max}}else if(h>max){w=w*max/h;h=max}
+    const c=document.createElement('canvas');c.width=Math.round(w);c.height=Math.round(h);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',.72))};
+  img.onerror=()=>{URL.revokeObjectURL(url);rej()};img.src=url})}
+/* ---------- install ---------- */
+let deferredPrompt=null;
+const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+function installHTML(){if(standalone())return'';
+  if(deferredPrompt)return`<div class="install"><p>홈 화면에 추가하면 앱처럼 쓸 수 있어요</p><button class="btn sm" data-act="install">설치</button></div>`;
+  if(isIOS)return`<div class="install"><p>Safari 공유 버튼 → ‘홈 화면에 추가’를 누르면 앱처럼 쓸 수 있어요</p></div>`;return''}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if(ui.view==='home')render()});
+window.addEventListener('appinstalled',()=>{deferredPrompt=null;render()});
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+/* ---------- 같이 쓰기 (Firebase) ---------- */
+const FBV='10.12.2',CFG=window.FIREBASE_CONFIG||null;
+let fb=null,fbUid=null,fbReady=null;const subs={},synced={},pendPh=new Set();
+const rand=n=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789',r=new Uint32Array(n);crypto.getRandomValues(r);return[...r].map(x=>a[x%a.length]).join('')};
+const stable=o=>o===null||typeof o!=='object'?JSON.stringify(o??null):Array.isArray(o)?'['+o.map(stable).join(',')+']':'{'+Object.keys(o).filter(k=>o[k]!==undefined).sort().map(k=>JSON.stringify(k)+':'+stable(o[k])).join(',')+'}';
+function phash(s){let h=5381;for(let i=0;i<s.length;i+=7)h=((h<<5)+h+s.charCodeAt(i))|0;return s.length.toString(36)+'x'+(h>>>0).toString(36)}
+const myName=()=>{try{return localStorage.getItem('tripnote.name')||''}catch(e){return''}};
+function needName(cb){if(myName())return cb();openSheet('내 이름',[{k:'name',l:'같이 쓰는 사람에게 보일 이름',ph:'예: 지수'}],{},v=>{if(!v.name)return'이름을 적어주세요';try{localStorage.setItem('tripnote.name',v.name.slice(0,20))}catch(e){}setTimeout(cb,0)})}
+function fbInit(){
+  if(!CFG)return Promise.resolve(null);if(fbReady)return fbReady;
+  fbReady=(async()=>{const base='https://www.gstatic.com/firebasejs/'+FBV+'/';
+    const[A,U,F]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
+    const app=A.initializeApp(CFG),auth=U.getAuth(app);let db;
+    try{db=F.initializeFirestore(app,{localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})})}catch(e){db=F.getFirestore(app)}
+    await auth.authStateReady();let user=auth.currentUser;if(!user)user=(await U.signInAnonymously(auth)).user;
+    fbUid=user.uid;fb={F,db,uid:fbUid};return fb})().catch(e=>{console.warn('firebase',e);fbReady=null;return null});
+  return fbReady}
+function startSync(){
+  if(Object.values(trips).some(t=>t.shared))fbInit().then(f=>{if(f)Object.values(trips).forEach(t=>t.shared&&sub(t.id))});
+  checkJoinHash()}
+function checkJoinHash(){const h=location.hash;if(/^#join-/.test(h)){try{history.replaceState(null,'',location.pathname+location.search)}catch(e){}needName(()=>joinFrom(h))}}
+window.addEventListener('hashchange',checkJoinHash);
+function toRemote(t){const cl=x=>JSON.parse(JSON.stringify(x??{})),map=(arr,f)=>{const o={};(arr||[]).forEach(x=>{if(x&&x.id)o[x.id]=f?f(x):cl(x)});return o};
+  return{meta:{title:t.title||'',dest:t.dest||'',start:t.start||'',end:t.end||''},dayInfo:cl(t.dayInfo),places:map(t.places),resv:map(t.resv),checks:map(t.checks),
+    shop:map(t.shop,i=>({id:i.id,name:i.name||'',store:i.store||'',memo:i.memo||'',checked:!!i.checked,createdAt:i.createdAt||0,ph:i.photo?phash(i.photo):(i._pend&&i.ph||null)}))}}
+function fromRemote(id,d,old){const m=d.meta||{},prev={};(old&&old.shop||[]).forEach(i=>prev[i.id]=i);
+  const vals=o=>Object.values(o&&typeof o==='object'?o:{}).filter(x=>x&&typeof x==='object'&&x.id);
+  const shop=vals(d.shop).map(i=>{const o=prev[i.id],have=!!(o&&o.photo&&i.ph&&phash(o.photo)===i.ph);return{...cleanShop({...i,photo:null}),ph:i.ph||null,photo:have?o.photo:null,_pend:!!(i.ph&&!have)}}).sort((a,b)=>b.createdAt-a.createdAt);
+  return norm({id,title:String(m.title||'여행'),dest:String(m.dest||''),start:String(m.start||''),end:String(m.end||''),dayInfo:d.dayInfo&&typeof d.dayInfo==='object'?d.dayInfo:{},
+    places:vals(d.places),resv:vals(d.resv),checks:vals(d.checks).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)),shop,shopFilter:old&&old.shopFilter||'ALL',
+    shared:{owner:String(d.owner||''),code:String(d.inviteCode||''),members:d.members&&typeof d.members==='object'?d.members:{}}})}
+function sub(id){if(subs[id]||!fb)return;const{F,db}=fb;if(!synced[id]&&trips[id])synced[id]=toRemote(trips[id]);
+  subs[id]=F.onSnapshot(F.doc(db,'trips',id),snap=>{if(!snap.exists()){unshare(id,'공유가 끝난 여행이에요. 내 폰에는 사본이 남아요');return}applyRemote(id,snap.data())},
+    err=>{if(err&&err.code==='permission-denied')unshare(id,'이 여행의 공유에서 빠졌어요. 내 폰에는 사본이 남아요');else console.warn(err)})}
+function unshare(id,msg){if(subs[id]){subs[id]();delete subs[id]}delete synced[id];const t=trips[id];
+  if(ui.pendingOpen===id){ui.pendingOpen=null;if(!t||!t.shared){delete trips[id];toast('링크가 만료됐거나 잘못됐어요');render();return}}
+  if(t&&t.shared){delete t.shared;save();render();if(msg)toast(msg)}}
+function applyRemote(id,d){const old=trips[id],before=old?stable(toRemote(old))+stable(old.shared||null):'';
+  const fresh=fromRemote(id,d,old);let t=fresh;
+  if(old){for(const k of['places','resv','checks','shop'])fresh[k]=reuse(old[k],fresh[k]);for(const k of Object.keys(old))if(!(k in fresh))delete old[k];Object.assign(old,fresh);t=old}
+  trips[id]=t;synced[id]=toRemote(t);
+  if(ui.pendingOpen===id){ui.pendingOpen=null;ui.id=id;ui.view='trip';ui.tab='plan';ui.day='all';toast(`‘${t.title}’에 참여했어요`)}
+  if(stable(synced[id])+stable(t.shared)!==before){save();render()}
+  fetchPhotos(id)}
+function reuse(oa,na){const om={};(oa||[]).forEach(o=>om[o.id]=o);return na.map(n=>{const o=om[n.id];if(!o)return n;for(const k of Object.keys(o))if(!(k in n))delete o[k];return Object.assign(o,n)})}
+function fetchPhotos(id){const t=trips[id];if(!fb||!t)return;const{F,db}=fb;
+  for(const i of t.shop)if(i._pend&&i.ph&&!pendPh.has(id+i.id)){const key=id+i.id;pendPh.add(key);
+    F.getDoc(F.doc(db,'trips',id,'photos',i.id)).then(s=>{const d=s.exists()?s.data():null,cur=trips[id]&&trips[id].shop.find(x=>x.id===i.id);
+      if(cur&&d&&okImg(d.data)&&d.ph===cur.ph){cur.photo=d.data;cur._pend=false;synced[id]=toRemote(trips[id]);save();render()}}).catch(()=>{}).finally(()=>setTimeout(()=>{pendPh.delete(key);const tt=trips[id];if(tt&&tt.shop.some(x=>x._pend))fetchPhotos(id)},6000))}}
+function pushDiff(id){const t=trips[id];if(!fb||!t||!t.shared||!synced[id])return;const{F,db}=fb,prev=synced[id],next=toRemote(t),up={};
+  for(const k of['title','dest','start','end'])if((prev.meta||{})[k]!==next.meta[k])up['meta.'+k]=next.meta[k];
+  for(const sec of['dayInfo','places','resv','checks','shop']){const a=prev[sec]||{},b=next[sec]||{};
+    for(const k in b)if(stable(a[k])!==stable(b[k]))up[sec+'.'+k]=b[k];
+    for(const k in a)if(!(k in b))up[sec+'.'+k]=F.deleteField()}
+  const pa=prev.shop||{},pb=next.shop;
+  for(const k in pb){const ph=pb[k].ph;if(ph&&ph!==(pa[k]&&pa[k].ph)){const it=t.shop.find(x=>x.id===k);if(it&&it.photo)F.setDoc(F.doc(db,'trips',id,'photos',k),{data:it.photo,ph}).catch(()=>toast('사진을 올리지 못했어요'))}}
+  for(const k in pa)if(pa[k].ph&&!(pb[k]&&pb[k].ph))F.deleteDoc(F.doc(db,'trips',id,'photos',k)).catch(()=>{});
+  synced[id]=next;
+  if(Object.keys(up).length)F.updateDoc(F.doc(db,'trips',id),up).catch(e=>toast(e&&e.code==='permission-denied'?'이 여행을 고칠 권한이 없어요':'동기화하지 못했어요. 인터넷을 확인해주세요'))}
+async function shareTrip(t0){const f=await fbInit();
+  if(!f){toast(CFG?'공유 서버에 연결하지 못했어요. 인터넷을 확인해주세요':'같이 쓰기 설정이 아직 안 됐어요 (README의 Firebase 설정 참고)');return}
+  const{F,db}=f,id=uid(),code=rand(24),t={...t0,id};delete trips[t0.id];trips[id]=t;ui.id=id;
+  const members={[fbUid]:{name:myName(),at:Date.now()}};t.shared={owner:fbUid,code,members};synced[id]=toRemote(t);save();
+  F.setDoc(F.doc(db,'trips',id),{owner:fbUid,members,inviteCode:code,joinWith:'',created:Date.now(),...toRemote(t)}).catch(e=>toast('공유를 만들지 못했어요 ('+(e.code||'')+')'));
+  t.shop.forEach(i=>{if(i.photo)F.setDoc(F.doc(db,'trips',id,'photos',i.id),{data:i.photo,ph:phash(i.photo)}).catch(()=>{})});
+  sub(id);render();inviteSheet(t)}
+const inviteLink=t=>location.origin+location.pathname+'#join-'+t.id+'-'+t.shared.code;
+const inviteText=t=>`‘${t.title}’ 여행 수첩에 초대해요. 링크를 열어 참여하거나, 여행 수첩 앱 홈의 ‘초대 링크로 참여’에 이 메시지를 붙여넣으세요.`;
+function inviteSheet(t){const L=inviteLink(t);
+  openSheet('친구 초대',[],{},null,null,`<p class="mute">이 링크를 받은 사람은 이 여행을 같이 보고 고칠 수 있어요.</p><input type="text" readonly value="${esc(L)}" style="font-size:14px" aria-label="초대 링크">
+  <div style="display:grid;gap:8px;margin-top:12px">${navigator.share?'<button type="button" class="btn pri" data-act="nshare">카톡 등으로 보내기</button>':''}<button type="button" class="btn${navigator.share?'':' pri'}" data-act="copy" data-v="${esc(inviteText(t)+'\n'+L)}">초대 메시지 복사</button></div>
+  <p class="mute" style="margin-top:12px">아이폰은 홈 화면 앱과 Safari가 따로 저장돼요. 앱으로 쓰는 친구는 앱 홈의 ‘초대 링크로 참여’에 붙여넣으라고 알려주세요.</p>`)}
+function shareHTML(t){
+  if(!t.shared)return`<section class="card" style="margin-top:0"><b>같이 쓰기</b><p class="mute" style="margin:4px 0 10px">친구를 초대하면 이 여행을 같이 보고 고칠 수 있어요.</p><button type="button" class="btn pri" data-act="share" style="width:100%">친구 초대하기</button></section>`;
+  const own=t.shared.owner===fbUid,ms=Object.entries(t.shared.members||{}).sort((a,b)=>((a[1]||{}).at||0)-((b[1]||{}).at||0));
+  return`<section class="card" style="margin-top:0"><b>같이 쓰는 사람 ${ms.length}명</b>
+  ${ms.map(([u,m])=>`<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)"><span class="sp">${esc((m&&m.name)||'이름 없음')}${u===fbUid?' <span class="mute">(나)</span>':''}${u===t.shared.owner?' <span class="badge ok">만든 사람</span>':''}</span>${own&&u!==fbUid?`<button type="button" class="btn sm" data-act="kick" data-u="${esc(u)}">내보내기</button>`:''}</div>`).join('')}
+  <div style="display:grid;gap:8px;margin-top:12px"><button type="button" class="btn pri" data-act="invite">초대 링크 보내기</button>${own?'<button type="button" class="btn sm" data-act="rotate">초대 링크 새로 만들기</button>':'<button type="button" class="btn sm danger" data-act="leave">공유에서 나가기</button>'}</div></section>`}
+async function joinFrom(str){const m=String(str).match(/join-([a-z0-9]+)-([A-Za-z0-9]+)/);if(!m){toast('초대 링크가 아니에요');return}
+  const id=m[1],code=m[2];if(trips[id]&&trips[id].shared){ui.id=id;ui.view='trip';render();return}
+  const f=await fbInit();if(!f){toast(CFG?'공유 서버에 연결하지 못했어요. 인터넷을 확인해주세요':'같이 쓰기 설정이 안 된 앱이에요');return}
+  toast('참여하는 중…');
+  try{await f.F.updateDoc(f.F.doc(f.db,'trips',id),{['members.'+fbUid]:{name:myName(),at:Date.now()},joinWith:code})}
+  catch(e){toast(e&&(e.code==='permission-denied'||e.code==='not-found')?'링크가 만료됐거나 잘못됐어요':'참여하지 못했어요 ('+((e&&e.code)||'')+')');return}
+  ui.pendingOpen=id;sub(id)}
+async function leaveTrip(id,silent){const t=trips[id];if(!fb||!t)return;
+  try{await fb.F.updateDoc(fb.F.doc(fb.db,'trips',id),{['members.'+fbUid]:fb.F.deleteField()})}catch(e){}
+  if(subs[id]){subs[id]();delete subs[id]}delete synced[id];if(t.shared){delete t.shared;save()}if(!silent){closeSheet();render();toast('공유에서 나왔어요')}}
+async function remoteDelete(id,t){if(!fb)return;const{F,db}=fb;if(subs[id]){subs[id]();delete subs[id]}delete synced[id];
+  try{await Promise.all(t.shop.filter(i=>i.photo||i.ph).map(i=>F.deleteDoc(F.doc(db,'trips',id,'photos',i.id)).catch(()=>{})));await F.deleteDoc(F.doc(db,'trips',id))}catch(e){toast('서버에서 지우지 못했어요')}}
+/* ---------- sheet ---------- */
+let sheetSave=null,sheetDel=null;
+function field(f,v){const val=v??'';
+  if(f.type==='select')return`<div class="f"><label for="f_${f.k}">${f.l}</label><select id="f_${f.k}" name="${f.k}">${f.opts.map(o=>{const[ov,ol]=Array.isArray(o)?o:[o,o];return`<option value="${esc(ov)}" ${ov===val?'selected':''}>${esc(ol)}</option>`}).join('')}</select></div>`;
+  if(f.type==='textarea')return`<div class="f"><label for="f_${f.k}">${f.l}</label><textarea id="f_${f.k}" name="${f.k}" placeholder="${esc(f.ph||'')}">${esc(val)}</textarea></div>`;
+  if(f.type==='check')return`<div class="f"><label style="display:flex;gap:10px;align-items:center;color:var(--ink);min-height:44px"><input type="checkbox" name="${f.k}" ${val?'checked':''} style="width:22px;height:22px;accent-color:var(--acc)">${f.l}</label></div>`;
+  return`<div class="f"><label for="f_${f.k}">${f.l}</label><input id="f_${f.k}" type="${f.type||'text'}" name="${f.k}" value="${esc(val)}" placeholder="${esc(f.ph||'')}"></div>`}
+function openSheet(title,fields,vals,onSave,onDel,extra){
+  sheetSave=onSave;sheetDel=onDel;
+  const body=fields.map(f=>Array.isArray(f)?`<div class="f two">${f.map(x=>field(x,vals[x.k])).join('')}</div>`:field(f,vals[f.k])).join('');
+  $('#sheet').innerHTML=`<form id="sf"><h3 class="disp">${esc(title)}</h3>${extra||''}${body}<p class="warn" id="serr"></p>
+  <div class="row" style="margin-top:14px">${onDel?'<button type="button" class="btn danger" data-act="sdel">삭제</button>':''}<span class="sp"></span><button type="button" class="btn" data-act="sclose">닫기</button>${onSave?'<button class="btn pri">저장</button>':''}</div></form>`;
+  $('#veil').classList.add('on');const k0=fields.flat()[0];const first=$('#sheet input[type=text],#sheet textarea');if(first&&k0&&!vals[k0.k])first.focus();
+}
+function closeSheet(){$('#veil').classList.remove('on');$('#sheet').innerHTML='';sheetSave=sheetDel=null}
+function confirmSheet(msg,yes,onYes){sheetSave=sheetDel=null;$('#sheet').innerHTML=`<h3>${esc(msg)}</h3><div class="row"><span class="sp"></span><button class="btn" data-act="sclose">취소</button><button class="btn pri" id="yes">${esc(yes)}</button></div>`;$('#veil').classList.add('on');$('#yes').onclick=()=>{closeSheet();onYes()}}
+
+const TRIP_F=[{k:'title',l:'여행 이름',ph:'예: 도쿄'},{k:'dest',l:'여행지 (지도 검색에 쓰여요)',ph:'예: 도쿄, 일본'},[{k:'start',l:'출발',type:'date'},{k:'end',l:'도착',type:'date'}]];
+function tripForm(t){openSheet(t?'여행 정보':'새 여행',TRIP_F,t||{},v=>{if(v.start&&v.end&&v.end<v.start)return'도착일이 출발일보다 빨라요';
+  if(t){Object.assign(t,v);if(!t.end)t.end=t.start;touch()}else{ui.id=newTrip(v);ui.view='trip';ui.tab='plan';ui.day='all';render()}})}
+function placeForm(p,day){const t=T(),ds=days(t);
+  openSheet(p?'장소 수정':'장소 추가',[{k:'name',l:'장소 이름',ph:'예: 와규 야키니쿠 테츠'},[{k:'tag',l:'종류',type:'select',opts:TAGS},{k:'day',l:'날짜',type:'select',opts:[['','보관함 (미정)'],...ds.map((d,i)=>[d,'D'+(i+1)+' '+md(d)])]}],
+  [{k:'time',l:'갈 시간',type:'time'},{k:'hours',l:'영업시간·휴무',ph:'15–23시, 화 휴무'}],{k:'memo',l:'메모',type:'textarea',ph:'현금만 받음 / 2층 창가 / 이거 시키기'},[{k:'cost',l:'예상 비용',ph:'¥6,000~10,000'},{k:'url',l:'링크 (https)',type:'url',ph:'https://'}],
+  [{k:'needBook',l:'예약 필요한 곳',type:'check'},{k:'booked',l:'예약 완료',type:'check'}],{k:'bookBy',l:'언제까지 예약할지 (선택)',type:'date'},{k:'done',l:'다녀왔어요',type:'check'}],
+  p||{tag:'맛집',day:day||''},v=>{if(!v.name.trim())return'장소 이름을 적어주세요';
+    if(p){if(p.day!==v.day)v.order=Date.now();Object.assign(p,v)}else t.places.push({id:uid(),order:Date.now(),...v});touch()},
+  p?()=>{t.places=t.places.filter(x=>x!==p);touch()}:null)}
+function resvForm(r,preset){const t=T();
+  openSheet(r?'예약 수정':'예약 추가',[[{k:'status',l:'상태',type:'select',opts:[['booked','예약 완료'],['need','아직 예약 전']]},{k:'kind',l:'종류',type:'select',opts:KINDS}],{k:'title',l:'이름',ph:'예: 일본항공 JL090 김포→하네다'},[{k:'date',l:'이용 날짜',type:'date'},{k:'time',l:'시간',type:'time'}],
+  {k:'code',l:'예약번호',ph:'ABC123'},[{k:'price',l:'금액',ph:'₩320,000'},{k:'by',l:'언제까지 예약 (예약 전일 때)',type:'date'}],[{k:'cancelBy',l:'무료 취소 기한',type:'date'},{k:'paid',l:'결제 완료',type:'check'}],{k:'url',l:'예약·바우처 링크 (https)',type:'url',ph:'https://'},{k:'memo',l:'메모',type:'textarea',ph:'체크인 15시 / 수하물 15kg 포함'}],
+  r||{kind:'항공',status:'booked',date:t.start||'',...(preset||{})},v=>{if(!v.title.trim())return'이름을 적어주세요';if(r)Object.assign(r,v);else t.resv.push({id:uid(),...v});touch()},
+  r?()=>{t.resv=t.resv.filter(x=>x!==r);touch()}:null)}
+
+function importJSON(txt){try{const o=JSON.parse(txt);if(!o||typeof o!=='object'||!Array.isArray(o.places))return'백업 형식이 아니에요';
+  const id=uid();trips[id]=norm({id,title:String(o.title||'가져온 여행'),dest:String(o.dest||''),start:String(o.start||''),end:String(o.end||''),places:o.places,resv:Array.isArray(o.resv)?o.resv:[],checks:Array.isArray(o.checks)?o.checks:[],dayInfo:o.dayInfo&&typeof o.dayInfo==='object'?o.dayInfo:{},shop:Array.isArray(o.shop)?o.shop.map(cleanShop):[]});save();render();return''}catch(err){return'읽을 수 없는 내용이에요'}}
+/* ---------- events ---------- */
+document.addEventListener('submit',e=>{e.preventDefault();const f=e.target;
+  if(f.id==='sf'){if(!sheetSave)return;const v={};f.querySelectorAll('[name]').forEach(el=>v[el.name]=el.type==='checkbox'?el.checked:el.value.trim());
+    const err=sheetSave(v);if(err){$('#serr').textContent=err;return}closeSheet();return}
+  if(f.classList.contains('addrow')){const i=f.querySelector('input'),s=i.value.trim();if(!s)return;const t=T();
+    if(f.dataset.kind==='tobook'){t.resv.push({id:uid(),status:'need',kind:'티켓',title:s,date:'',time:'',code:'',price:'',by:'',cancelBy:'',paid:false,url:'',memo:''});touch();toast('추가했어요. 눌러서 날짜·기한을 적을 수 있어요');const a=$('.addrow[data-kind=tobook] input');if(a)a.focus();return}
+    t.checks.push({id:uid(),createdAt:Date.now(),sec:f.dataset.sec,text:s,done:false});touch();
+    const again=document.querySelector(`.addrow[data-sec="${CSS.escape(f.dataset.sec)}"] input`);if(again)again.focus()}
+});
+document.addEventListener('change',async e=>{const el=e.target;
+  if(el.id==='photoIn'&&el.files&&el.files[0]){try{curPhoto=await compress(el.files[0]);photoTouched=true;photoBox()}catch(err){toast('사진을 읽지 못했어요')}el.value='';return}
+  if(el.id==='fileIn'&&el.files&&el.files[0]){const fr=new FileReader();fr.onload=()=>{const err=importJSON(String(fr.result));if(err)toast(err);else toast('불러왔어요')};fr.readAsText(el.files[0]);el.value='';return}
+  const t=T();if(!t)return;
+  if(el.dataset.act==='check'){const c=t.checks.find(x=>x.id===el.dataset.id);if(c){c.done=el.checked;touch()}}
+  if(el.dataset.act==='bookDone'){
+    if(el.dataset.type==='p'){const p=t.places.find(x=>x.id===el.dataset.id);if(p){p.booked=true;touch();toast(`‘${p.name}’ 예약 완료로 표시했어요`)}}
+    else{const r=t.resv.find(x=>x.id===el.dataset.id);if(r){r.status='booked';touch();resvForm(r);toast('예약 완료로 옮겼어요. 예약번호를 적어두세요')}}}
+});
+$('#veil').addEventListener('click',e=>{if(e.target.id==='veil')closeSheet()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet()});
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]');if(!b||b.dataset.act==='check'||b.dataset.act==='bookDone')return;
+  const a=b.dataset.act,id=b.dataset.id,t=T();
+  if(a==='home'){ui.view='home';render();scrollTo(0,0)}
+  else if(a==='openTrip'){ui.id=id;ui.view='trip';ui.tab='plan';ui.tag='전체';const tr=trips[id],td=today();ui.day=tr.start&&td>=tr.start&&td<=(tr.end||tr.start)?td:'all';render();scrollTo(0,0)}
+  else if(a==='newTrip')tripForm(null);
+  else if(a==='editTrip')tripForm(t);
+  else if(a==='tab'){ui.tab=b.dataset.k;render();scrollTo(0,0)}
+  else if(a==='day'){ui.day=b.dataset.d;ui.tab='plan';render();scrollTo(0,0)}
+  else if(a==='tag'){ui.tag=b.dataset.k;render()}
+  else if(a==='addPlace')placeForm(null);
+  else if(a==='editPlace')placeForm(t.places.find(x=>x.id===id));
+  else if(a==='toggleDone'){const p=t.places.find(x=>x.id===id);if(p){p.done=!p.done;touch()}}
+  else if(a==='dayInfo'){const d=b.dataset.d;openSheet('이날 제목·메모',[{k:'title',l:'제목',ph:'예: 도착 · 쇼핑데이'},{k:'memo',l:'메모',type:'textarea',ph:'예: 비 오면 실내 위주'}],t.dayInfo[d]||{},v=>{t.dayInfo[d]=v;touch()})}
+  else if(a==='addToDay'){const d=b.dataset.d,ds=days(t),box=t.places.filter(p=>!p.day||!ds.includes(p.day));
+    openSheet(md(d)+'에 넣기',[],{},null,null,`${box.length?'<p class="mute">보관함에서 고르기</p>'+box.map(p=>`<button type="button" class="tcard" data-act="pick" data-id="${esc(p.id)}" data-d="${d}"><span class="n disp" style="font-size:19px">${esc(p.name)}</span><span class="mute">${esc(p.tag)}</span></button>`).join(''):'<p class="mute">보관함이 비어 있어요.</p>'}<button type="button" class="btn pri" data-act="newOnDay" data-d="${d}" style="width:100%;margin-top:8px">+ 새 장소 만들기</button>`)}
+  else if(a==='pick'){const p=t.places.find(x=>x.id===id);if(p){p.day=b.dataset.d;p.order=Date.now()}closeSheet();touch();toast('넣었어요. 시간을 적으면 순서대로 정렬돼요')}
+  else if(a==='newOnDay'){const d=b.dataset.d;closeSheet();placeForm(null,d)}
+  else if(a==='addResvDay')resvForm(null,{date:b.dataset.d,kind:'교통'});
+  else if(a==='addResv')resvForm(null);
+  else if(a==='editResv')resvForm(t.resv.find(x=>x.id===id));
+  else if(a==='copy'){try{await navigator.clipboard.writeText(b.dataset.v);toast('복사했어요')}catch(err){toast('복사가 막혔어요. 길게 눌러 복사하세요')}}
+  else if(a==='delCheck'){t.checks=t.checks.filter(x=>x.id!==id);touch()}
+  else if(a==='resetChecks'){t.checks.forEach(c=>c.done=false);touch()}
+  else if(a==='newSec')openSheet('새 그룹',[{k:'sec',l:'그룹 이름',ph:'예: 공항 가기 전'},{k:'text',l:'첫 항목',ph:'예: 온라인 체크인'}],{},v=>{if(!v.sec||!v.text)return'둘 다 적어주세요';t.checks.push({id:uid(),createdAt:Date.now(),sec:v.sec,text:v.text,done:false});touch()});
+  else if(a==='tripMenu')openSheet('여행 설정',[],{},null,null,`${shareHTML(t)}<div style="display:grid;gap:8px"><button type="button" class="btn" data-act="editTrip2">이름·날짜 수정</button><button type="button" class="btn" data-act="backup">백업 (복사해서 보관)</button><button type="button" class="btn danger" data-act="delTrip">이 여행 삭제</button></div>`);
+  else if(a==='editTrip2'){closeSheet();tripForm(t)}
+  else if(a==='backup'){const j=JSON.stringify(t);$('#sheet').innerHTML=`<h3>백업</h3><p class="mute">아래 내용을 복사해 메모앱 등에 보관하세요. 홈의 ‘가져오기’로 되살릴 수 있어요.</p><textarea readonly style="min-height:180px;font-size:13px">${esc(j)}</textarea><div class="row" style="margin-top:12px"><span class="sp"></span><button class="btn" data-act="sclose">닫기</button><button class="btn" data-act="copy" data-v="${esc(j)}">전체 복사</button><button class="btn pri" data-act="saveFile">파일로 저장</button></div>`}
+  else if(a==='delTrip'){if(t.shared&&!fb)await fbInit();const own=t.shared&&t.shared.owner===fbUid;confirmSheet(t.shared?(own?`‘${t.title}’을 지울까요? 같이 쓰는 사람들 폰에서도 사라져요.`:`‘${t.title}’에서 나가고 내 폰에서 지울까요? 다른 사람들은 계속 쓸 수 있어요.`):`‘${t.title}’을 지울까요? 되돌릴 수 없어요.`,t.shared&&!own?'나가고 삭제':'삭제',async()=>{const k=ui.id;if(t.shared){if(own)await remoteDelete(k,t);else await leaveTrip(k,true)}delete trips[k];ui.view='home';save();render()})}
+  else if(a==='import')openSheet('백업 가져오기',[{k:'json',l:'백업 내용 붙여넣기',type:'textarea'}],{},v=>importJSON(v.json));
+  else if(a==='sample'){const s=new Date();s.setDate(s.getDate()+18);const d0=iso(s),dd=n=>{const x=pd(d0);x.setDate(x.getDate()+n);return iso(x)};
+    const id=newTrip({title:'도쿄 (예시)',dest:'도쿄, 일본',start:d0,end:dd(2)}),x=trips[id];
+    x.dayInfo={[d0]:{title:'도착 · 쇼핑데이',memo:''},[dd(1)]:{title:'디즈니데이',memo:'개장 30분 전 도착'},[dd(2)]:{title:'쓰키지 · 귀국',memo:''}};
+    x.places=[['아오야마 점심','맛집',0,'11:30','','',false],['신주쿠 쇼핑','쇼핑',0,'14:00','','이세탄 → 루미네',false],['와규 야키니쿠 테츠','맛집',0,'18:30','15–23시','코스 ¥6,000~10,000\n김치·나물 기본',true],['도쿄 디즈니씨','관광',1,'08:30','','DPA는 앱에서만 구매',false],['쓰키지 장외시장','맛집',2,'09:00','대부분 14시 전 마감','계란말이, 참치덮밥',false],['텐푸라 츠나하치','맛집','','','17:30–21:30','',true]]
+      .map(([name,tag,di,time,hours,memo,nb],i)=>({id:uid(),name,tag,day:di===''?'':dd(di),time,hours,memo,cost:'',url:'',done:false,needBook:nb,booked:false,bookBy:nb&&di!==''?dd(-5):'',order:i}));
+    x.resv=[{id:uid(),status:'booked',kind:'항공',title:'김포 → 하네다 (예시편)',date:d0,time:'08:15',code:'EXAMPL',price:'₩298,000',paid:true,by:'',cancelBy:'',url:'',memo:'김포 국제선 06:30 도착'},
+      {id:uid(),status:'booked',kind:'숙소',title:'신주쿠 호텔 2박',date:d0,time:'20:45',code:'HTL-2048',price:'₩420,000',paid:false,by:'',cancelBy:dd(-2),url:'',memo:'11:45경 체크인 전 짐 보관 요청'},
+      {id:uid(),status:'need',kind:'티켓',title:'디즈니 1일권 2장',date:dd(1),time:'',code:'',price:'¥10,900×2',paid:false,by:dd(-7),cancelBy:'',url:'',memo:'공식 사이트에서 해외카드 오류 나면 클룩·KKday'}];
+    save(id);ui.id=id;ui.view='trip';ui.tab='plan';ui.day=d0;render()}
+  else if(a==='addShop')shopForm(null);
+  else if(a==='editShop')shopForm(t.shop.find(x=>x.id===id));
+  else if(a==='shopCheck'){const i=t.shop.find(x=>x.id===id);if(i){i.checked=!i.checked;touch()}}
+  else if(a==='shopDel'){const i=t.shop.find(x=>x.id===id);if(i)confirmSheet('이 아이템을 삭제할까요?','삭제',()=>{t.shop=t.shop.filter(x=>x!==i);touch()})}
+  else if(a==='shopFilter'){t.shopFilter=b.dataset.k;touch()}
+  else if(a==='storePick'){const st=$('#f_store');if(st)st.value=b.dataset.v}
+  else if(a==='rmPhoto'){e.preventDefault();curPhoto=null;photoTouched=true;photoBox()}
+  else if(a==='install'&&deferredPrompt){deferredPrompt.prompt();deferredPrompt.userChoice.finally(()=>{deferredPrompt=null;render()})}
+  else if(a==='importFile'){let fi=$('#fileIn');if(!fi){document.body.insertAdjacentHTML('beforeend','<input type="file" id="fileIn" accept="application/json,.json" hidden>');fi=$('#fileIn')}fi.click()}
+  else if(a==='saveFile'){const blob=new Blob([JSON.stringify(t)],{type:'application/json'}),u=URL.createObjectURL(blob),l=document.createElement('a');l.href=u;l.download=(t.title||'trip').replace(/[\\/:*?"<>|]/g,'_')+'-백업.json';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}
+  else if(a==='share'){closeSheet();needName(()=>shareTrip(t))}
+  else if(a==='invite')inviteSheet(t);
+  else if(a==='nshare'){const L=inviteLink(t);try{await navigator.share({title:'여행 수첩 초대',text:inviteText(t),url:L})}catch(err){if(err&&err.name!=='AbortError'){try{await navigator.clipboard.writeText(inviteText(t)+'\n'+L);toast('초대 메시지를 복사했어요')}catch(e2){toast('링크를 길게 눌러 복사하세요')}}}}
+  else if((a==='rotate'||a==='kick'||a==='leave')&&!fb)toast('공유 서버에 연결하지 못했어요. 인터넷을 확인해주세요');
+  else if(a==='rotate'){confirmSheet('초대 링크를 새로 만들까요? 예전 링크로는 더 이상 참여할 수 없어요.','새로 만들기',()=>{const c=rand(24);fb.F.updateDoc(fb.F.doc(fb.db,'trips',t.id),{inviteCode:c}).then(()=>toast('새 링크를 만들었어요')).catch(err=>toast('바꾸지 못했어요 ('+(err.code||'')+')'));t.shared.code=c})}
+  else if(a==='kick'){const u=b.dataset.u,nm=((t.shared.members||{})[u]||{}).name||'이 사람';confirmSheet(`${nm}님을 내보낼까요?`,'내보내기',()=>{fb.F.updateDoc(fb.F.doc(fb.db,'trips',t.id),{['members.'+u]:fb.F.deleteField()}).catch(err=>toast('내보내지 못했어요'))})}
+  else if(a==='leave'){confirmSheet(`‘${t.title}’ 공유에서 나갈까요? 내 폰에는 지금까지 내용이 사본으로 남아요.`,'나가기',()=>leaveTrip(t.id,false))}
+  else if(a==='joinPaste'){openSheet('초대 링크로 참여',[{k:'link',l:'받은 초대 링크나 메시지를 붙여넣으세요',type:'textarea'}],{},v=>{if(!/join-[a-z0-9]+-[A-Za-z0-9]+/.test(v.link))return'초대 링크를 찾지 못했어요';const L=v.link;setTimeout(()=>needName(()=>joinFrom(L)),0)})}
+  else if(a==='sclose')closeSheet();
+  else if(a==='sdel'&&sheetDel){const f=sheetDel;closeSheet();f()}
+});
+render();init();
+}
+</script>
+</body></html>
